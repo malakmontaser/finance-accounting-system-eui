@@ -1,0 +1,248 @@
+
+/* ===== GLOBAL STYLES ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+
+/* Smooth scrolling and offset for anchored sections (JS will adjust exact offset) */
+html {
+  scroll-behavior: smooth;
+  /* Fallback padding to avoid content under header when jumping to anchors */
+  scroll-padding-top: 70px;
+}
+body {
+  background-color: #ffffff;
+  color: #0d1b2a;
+  scroll-behavior: smooth;
+}
+
+/* ===== NAVBAR ===== */
+.navbar {
+  background-color: #0d1b2a;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 2rem;
+  
+}
+
+.logo {
+  font-weight: 600;
+}
+
+.logo img {
+  width: 80px;
+  background-color: white;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+
+
+.navbar a {
+  text-decoration: none;
+  color: white;
+  font-weight: 500;
+  transition: 0.3s;
+  margin-left: 1.5rem;
+
+}
+
+.navbar a:hover {
+  color: #f0c330;
+}
+
+.btn {
+  background-color: #f0c330;
+  color: #0d1b2a;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: 0.3s;
+}
+
+.btn:hover {
+  background-color: #f7d35f;
+}
+
+.hero {
+    /* Full width background color */
+    background-color: #1d304f;
+    color: #f4f4f4;
+    padding: 100px 0; /* Vertical padding */
+}
+
+.hero-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.hero-text {
+    flex: 1;
+    /* Text takes up less than half the space, allowing the image to dominate */
+    max-width: 45%; 
+    margin-right: 10%;
+    padding: 20px;
+}
+
+.hero-text h1 {
+    font-size: 3em; /* Large, bold title */
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.hero-text p {
+    font-size: 1.1em;
+    margin-bottom: 30px;
+    line-height: 1.5;
+}
+
+.hero-image {
+    flex: 1;
+    max-width: 50%; /* Image takes up the larger half */
+    text-align: right; /* Aligns the image to the right */
+}
+
+.hero-image img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px; 
+}
+
+/* Styling for the call-to-action button */
+.btn-primary {
+    background-color: #FFC107;
+    color: #1d304f;
+    padding: 12px 25px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #e0ac00; /* Darker yellow on hover */
+}
+
+
+
+/* ===== FEATURES ===== */
+.features {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.features h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.features p {
+  color: #555;
+  margin-bottom: 2rem;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;
+  justify-items: center;
+}
+
+.feature img {
+  width: 60px;
+  margin-bottom: 1rem;
+}
+
+.feature h3 {
+  color: #0d1b2a;
+  font-weight: 600;
+}
+
+/* ===== ABOUT ===== */
+.about {
+  background-color: #f9f9f9;
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.about h2 {
+  margin-bottom: 1rem;
+}
+
+.about p {
+  max-width: 700px;
+  margin: auto;
+  line-height: 1.6;
+}
+
+/* ===== CONTACT ===== */
+.contact {
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.contact h2 {
+  margin-bottom: 1rem;
+}
+
+.contact-form {
+  margin-bottom: 1rem;
+}
+
+.contact-form input {
+  padding: 0.7rem;
+  width: 250px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  margin-right: 0.5rem;
+}
+
+.contact-form button {
+  border: none;
+  cursor: pointer;
+  background-color: #0d1b2a;
+  color: white;
+  padding: 0.7rem 1.2rem;
+}
+
+.contact img {
+  width: 18px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  background-color: #0d1b2a;
+  color: white;
+  text-align: center;
+  padding: 1.2rem;
+  font-size: 0.9rem;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .hero-text, .hero-img {
+    max-width: 100%;
+  }
+
+  .navbar ul {
+    display: none; /* Hide navbar links on small screens */
+  }
+
+  .hero-img img {
+    width: 250px;
+  }
+}
