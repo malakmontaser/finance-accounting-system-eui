@@ -283,6 +283,48 @@ button[disabled] {
   cursor: not-allowed;
 }
 
+/* ===== PORTAL OPTIONS ===== */
+.portal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.portal-option {
+  background-color: #f9f9f9;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.portal-option:hover {
+  background-color: #f0c330;
+  border-color: #f0c330;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.portal-option h3 {
+  color: #0d1b2a;
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+}
+
+.portal-option p {
+  color: #555;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.portal-option:hover p {
+  color: #0d1b2a;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .hero {

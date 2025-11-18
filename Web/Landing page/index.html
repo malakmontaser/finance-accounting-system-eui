@@ -20,6 +20,9 @@
             <a href="#features">Features</a>
             <a href="#about">About Us</a>
             <a href="#contact">Contact</a>
+            <span id="user-display" class="muted" style="display:none;"></span>
+            <a href="#" class="btn" data-open="login-portal-modal" id="login-btn">Login</a>
+            <a href="#" class="btn" id="logout-link" style="display:none;">Logout</a>
         </nav>
     </header>
 
@@ -76,7 +79,159 @@
     <p><img src="assets/icons/email.png" alt="Email Icon" /> info@financeapp.com</p>
   </section>
 
-   <!-- ===== FOOTER ===== -->
+   <!-- ===== LOGIN PORTAL MODAL ===== -->
+  <div id="login-portal-modal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button class="modal-close" data-close="login-portal-modal" aria-label="Close">×</button>
+      <h2>Choose Your Portal</h2>
+      <p style="text-align: center; color: #555; margin-bottom: 1.5rem;">Select your login type</p>
+      <div class="portal-options">
+        <button class="portal-option" data-role="student">
+          <h3>Student</h3>
+          <p>Access your student account</p>
+        </button>
+        <button class="portal-option" data-role="finance">
+          <h3>Finance</h3>
+          <p>Access finance portal</p>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOGIN MODALS ===== -->
+  <div id="student-login-modal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button class="modal-close" data-close="student-login-modal" aria-label="Close">×</button>
+      <h2>Student Login</h2>
+      <form id="student-login-form" class="login-form" novalidate>
+        <input type="text" name="studentId" placeholder="Student ID or Email" required />
+        <input type="password" name="password" placeholder="Password" required minlength="6" />
+        <div class="form-error" id="student-login-error" aria-live="polite"></div>
+        <button type="submit" class="btn btn-block">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="finance-login-modal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button class="modal-close" data-close="finance-login-modal" aria-label="Close">×</button>
+      <h2>Finance Login</h2>
+      <form id="finance-login-form" class="login-form" novalidate>
+        <input type="text" name="id" placeholder="ID" required />
+        <input type="password" name="password" placeholder="Password" required minlength="6" />
+        <div class="form-error" id="finance-login-error" aria-live="polite"></div>
+        <button type="submit" class="btn btn-block">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const openModal = (id) => {
+        const m = document.getElementById(id);
+        if (!m) return;
+        m.classList.add('open');
+        m.setAttribute('aria-hidden', 'false');
+      };
+      const closeModal = (id) => {
+        const m = document.getElementById(id);
+        if (!m) return;
+        m.classList.remove('open');
+        m.setAttribute('aria-hidden', 'true');
+      };
+
+      const getAuth = () => {
+        try { return JSON.parse(localStorage.getItem('auth')) || null; } catch { return null; }
+      };
+      const setAuth = (auth) => {
+        localStorage.setItem('auth', JSON.stringify(auth));
+      };
+      const clearAuth = () => {
+        localStorage.removeItem('auth');
+      };
+
+      const updateNav = () => {
+        const auth = getAuth();
+        const loginBtn = document.getElementById('login-btn');
+        const logoutLink = document.getElementById('logout-link');
+        const userDisplay = document.getElementById('user-display');
+        if (auth) {
+          if (loginBtn) loginBtn.style.display = 'none';
+          if (logoutLink) logoutLink.style.display = 'inline-block';
+          if (userDisplay) { userDisplay.style.display = 'none'; }
+        } else {
+          if (loginBtn) loginBtn.style.display = 'inline-block';
+          if (logoutLink) logoutLink.style.display = 'none';
+          if (userDisplay) { userDisplay.style.display = 'none'; }
+        }
+      };
+
+      document.getElementById('logout-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        clearAuth();
+        updateNav();
+      });
+
+      document.querySelectorAll('[data-open]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          openModal(btn.getAttribute('data-open'));
+        });
+      });
+
+      document.querySelectorAll('.modal').forEach((m) => {
+        m.addEventListener('click', (e) => {
+          if (e.target.classList.contains('modal')) {
+            closeModal(m.id);
+          }
+        });
+      });
+
+      document.querySelectorAll('.modal-close').forEach((btn) => {
+        btn.addEventListener('click', () => closeModal(btn.getAttribute('data-close')));
+      });
+
+      // Handle portal option selection
+      document.querySelectorAll('.portal-option').forEach((option) => {
+        option.addEventListener('click', () => {
+          const role = option.getAttribute('data-role');
+          closeModal('login-portal-modal');
+          if (role === 'student') {
+            openModal('student-login-modal');
+          } else if (role === 'finance') {
+            openModal('finance-login-modal');
+          }
+        });
+      });
+
+      const handleSubmit = (formId, role, modalId) => {
+        const form = document.getElementById(formId);
+        if (!form) return;
+        const errorEl = document.getElementById(formId === 'student-login-form' ? 'student-login-error' : 'finance-login-error');
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const data = Object.fromEntries(new FormData(form).entries());
+          if (data.password && data.password.length < 6) {
+            errorEl.textContent = 'Password must be at least 6 characters.';
+            return;
+          }
+          errorEl.textContent = '';
+          const identifier = role === 'Student' ? (data.studentId || '') : (data.id || '');
+          const auth = { role, identifier };
+          setAuth(auth);
+          updateNav();
+          closeModal(modalId);
+        });
+      };
+
+      handleSubmit('student-login-form', 'Student', 'student-login-modal');
+      handleSubmit('finance-login-form', 'Finance', 'finance-login-modal');
+
+      updateNav();
+    })();
+  </script>
+
+  <!-- ===== FOOTER ===== -->
   <footer class="footer">
     <p>© 2025 Finance & Accounting System | Built by Team X (EUI)</p>
   </footer>
