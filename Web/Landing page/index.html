@@ -207,15 +207,9 @@
       const handleSubmit = (formId, role, modalId) => {
         const form = document.getElementById(formId);
         if (!form) return;
-        const errorEl = document.getElementById(formId === 'student-login-form' ? 'student-login-error' : 'finance-login-error');
         form.addEventListener('submit', (e) => {
           e.preventDefault();
           const data = Object.fromEntries(new FormData(form).entries());
-          if (data.password && data.password.length < 6) {
-            errorEl.textContent = 'Password must be at least 6 characters.';
-            return;
-          }
-          errorEl.textContent = '';
           const identifier = role === 'Student' ? (data.studentId || '') : (data.id || '');
           const auth = { role, identifier };
           setAuth(auth);
