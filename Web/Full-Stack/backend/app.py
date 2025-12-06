@@ -6,30 +6,70 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 
 def create_app():
+    """
+    Application factory function that creates and configures the Flask app.
+    """
     app = Flask(__name__)
     app.config.from_object(Config)
+    
+    # Enable CORS for cross-origin requests
     CORS(app)
+    
+    # Initialize database
     db.init_app(app)
+    
+    # Initialize migrations
     migrate = Migrate(app, db)
+    
+    # Initialize JWT authentication
     jwt = JWTManager(app)
 
-    # simple health
-    @app.route("/api/health")
+    # ========================================================================
+    # Health Check Endpoint
+    # ========================================================================
+    @app.route("/api/health", methods=["GET"])
     def health():
-        return jsonify({"status":"ok"})
+        """Simple health check endpoint."""
+        return jsonify({
+            "status": "ok",
+            "message": "Student Management and Finance System API is running"
+        }), 200
 
-    # import blueprints (defined next)
+    # ========================================================================
+    # Register Blueprints
+    # ========================================================================
     from routes.auth import auth_bp
     from routes.students import students_bp
-    from routes.transactions import transactions_bp
-    from routes.reports import reports_bp
+    from routes.finance import finance_bp
+    from routes.courses import courses_bp
 
+    # Authentication routes
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    
+    # Student routes
     app.register_blueprint(students_bp, url_prefix="/api/students")
-    app.register_blueprint(transactions_bp, url_prefix="/api/transactions")
-    app.register_blueprint(reports_bp, url_prefix="/api/reports")
+    
+    # Finance department routes
+    app.register_blueprint(finance_bp, url_prefix="/api/finance")
+    
+    # Course management routes
+    app.register_blueprint(courses_bp, url_prefix="/api/courses")
+
+    # ========================================================================
+    # Error Handlers
+    # ========================================================================
+    @app.errorhandler(404)
+    def not_found(error):
+        """Handle 404 errors."""
+        return jsonify({"error": "Resource not found"}), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 errors."""
+        return jsonify({"error": "Internal server error"}), 500
 
     return app
+
 
 if __name__ == "__main__":
     app = create_app()

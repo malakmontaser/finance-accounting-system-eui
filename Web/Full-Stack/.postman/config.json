@@ -1,0 +1,14 @@
+{
+  "workspace": {
+    "id": "8271c902-1f81-45c9-89e6-e8a70b8fbac6"
+  },
+  "entities": {
+    "collections": [
+      "..\\postman\\collections\\Finance Accounting System API.postman_collection.json"
+    ],
+    "environments": [],
+    "specs": [],
+    "flows": [],
+    "globals": []
+  }
+}

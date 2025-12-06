@@ -1,0 +1,645 @@
+{
+  "info": {
+    "_postman_id": "e28d9471-95f1-43f5-95aa-da664c9d1d71",
+    "name": "Finance Accounting System API",
+    "description": "Complete API collection for Student Management and Finance System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('student_id', jsonData.user_id);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "id": "c80c57c8-4c08-4100-a398-b03112529a9f"
+              }
+            }
+          ],
+          "id": "9f458b01-0b41-4cdb-a880-cd6b046c2236",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"teststudent\",\n    \"email\": \"teststudent@example.com\",\n    \"password\": \"test123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('student_token', jsonData.access_token);",
+                  "    pm.environment.set('student_id', jsonData.user_id);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "id": "f251fe88-1ded-4952-b2fe-089a85c599f1"
+              }
+            }
+          ],
+          "id": "d6de0bc5-e89d-44ba-9916-075fed939f78",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"student1\",\n    \"password\": \"pass123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('admin_token', jsonData.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "id": "aee25ed3-6a65-4a07-9cdc-dc826fc09ff9"
+              }
+            }
+          ],
+          "id": "41c5df32-8d4b-4e91-8af7-785361654510",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Register Admin",
+          "id": "8449d79b-69d2-4f81-9bff-10b22d7f1d88",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"newadmin\",\n    \"email\": \"admin@finance.edu\",\n    \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register-admin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register-admin"
+              ]
+            }
+          }
+        }
+      ],
+      "id": "117c8668-5669-43c2-9bfa-960ad8dc369f"
+    },
+    {
+      "name": "Courses",
+      "item": [
+        {
+          "name": "List All Courses",
+          "id": "f48efa68-130d-45ff-80a7-3546c6528c99",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/courses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "courses"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Course by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('course_id', jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "id": "7820513c-ab26-4d8d-a76d-5403aa4d7371"
+              }
+            }
+          ],
+          "id": "7702fed4-5c15-4a35-b2fa-15bf1b3ebcdc",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/courses/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "courses",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Course (Admin)",
+          "id": "ab31972c-6451-4cb1-a9a8-c10b1f742847",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": " application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": " Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"course_id\": \"MATH201\",\n    \"name\": \"Advanced Mathematics\",\n    \"credits\": 4,\n    \"total_fee\": 6000.0,\n    \"description\": \"Advanced topics in mathematics\"\n}"
+            },
+            "url": {
+              "raw": "http://127.0.0.1:5000/api/courses",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "5000",
+              "path": [
+                "api",
+                "courses"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Course (Admin)",
+          "id": "a2a2e8c4-a777-48e2-b61f-750bdbaa7348",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Updated Course Name\",\n    \"credits\": 5,\n    \"total_fee\": 7000.0,\n    \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/courses/{{course_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "courses",
+                "{{course_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Course (Admin)",
+          "id": "4b7bd71c-6107-40e5-9a78-0326cdfb26f6",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/courses/{{course_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "courses",
+                "{{course_id}}"
+              ]
+            }
+          }
+        }
+      ],
+      "id": "4eb32865-0444-411c-84f1-48c1716a77a3"
+    },
+    {
+      "name": "Students",
+      "item": [
+        {
+          "name": "Enroll in Course",
+          "id": "c44c94d6-bef3-4376-b7ed-8e8a12054532",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"course_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/students/enroll",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "enroll"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Make Payment",
+          "id": "14aac84b-645f-4a8b-82bf-db779629cb1d",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount\": 1000.0,\n    \"payment_method\": \"ONLINE\",\n    \"reference_number\": \"TXN123456\",\n    \"notes\": \"Payment via online portal\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/students/pay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "pay"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Student Status",
+          "id": "7044147d-f2e3-4229-b9aa-a1a1effe6155",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/students/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Payment History",
+          "id": "6e580e99-059f-448a-8607-0877f59384ad",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{student_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/students/payments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                "payments"
+              ]
+            }
+          }
+        }
+      ],
+      "id": "68de567f-cc3a-4c7d-8dd0-a0ad80f82ff2"
+    },
+    {
+      "name": "Finance (Admin Only)",
+      "item": [
+        {
+          "name": "Get Outstanding Dues",
+          "id": "2153670d-f4a0-4663-b06d-6c2f1073a3c9",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/finance/dues?min_amount=0&sort_by=dues_balance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "dues"
+              ],
+              "query": [
+                {
+                  "key": "min_amount",
+                  "value": "0"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "dues_balance"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unpaid Report",
+          "id": "a64e3de9-2039-411d-a463-74e8165dafd5",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/finance/unpaid-report",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "unpaid-report"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Contact Student",
+          "id": "68ff761c-b0bc-46e9-ad86-b9e5d8b6f934",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"contact_method\": \"EMAIL\",\n    \"notes\": \"Sent reminder email about pending dues\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/finance/action/contact/{{student_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "action",
+                "contact",
+                "{{student_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Record External Payment",
+          "id": "54acdc9f-f64f-48fc-a12c-fa0fb4ee42ab",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"student_id\": 1,\n    \"amount\": 2000.0,\n    \"payment_method\": \"BANK_TRANSFER\",\n    \"reference_number\": \"BANK123456\",\n    \"notes\": \"Payment received from student bank account\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/finance/record-payment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "record-payment"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Status Report (Pass/Fail)",
+          "id": "ff20fb24-a51d-48eb-a1a5-bf91000bbb96",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/finance/reports/status?threshold=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "finance",
+                "reports",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "threshold",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "id": "1db27e02-2ec0-4366-9310-2e3a776c4078"
+    },
+    {
+      "name": "Health Check",
+      "id": "17c7fd34-397f-4176-91a4-aaaae5252497",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "id": "eddb5084-7dae-4258-99b6-4b0779f6d808",
+      "key": "auth_token",
+      "value": ""
+    },
+    {
+      "id": "23f2a666-34bf-4839-8e90-3c31e8844d5d",
+      "key": "student_token",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "id": "58a8275a-689e-41f8-abeb-4fc717c38f73",
+      "key": "base_url",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "id": "d5e04c0a-70be-4a78-984f-5b9fb0086b56",
+      "key": "admin_token",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}

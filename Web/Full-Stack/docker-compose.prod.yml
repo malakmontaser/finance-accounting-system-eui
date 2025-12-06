@@ -1,0 +1,45 @@
+version: '3.8'
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-fas_db}
+      MYSQL_USER: ${DB_USER:-fas_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-StrongPassword123!}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    # Replace 'yourusername' with your Docker Hub username
+    # Example: image: yourusername/finance-accounting-api:latest
+    image: ${DOCKER_IMAGE:-seifwafeek/finance-accounting-api:latest}
+    restart: always
+    environment:
+      DB_USER: ${DB_USER:-fas_user}
+      DB_PASSWORD: ${DB_PASSWORD:-StrongPassword123!}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-fas_db}
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
+      FLASK_APP: app.py
+      FLASK_ENV: production
+    ports:
+      - "${API_PORT:-5000}:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: flask run --host=0.0.0.0 --port=5000
+
+volumes:
+  db_data:
+
