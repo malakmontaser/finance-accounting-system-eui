@@ -1,0 +1,69 @@
+{
+  "faculties": [
+    "All Faculties",
+    "Engineering",
+    "Computer Science",
+    "Business Informatics",
+    "Di Arts"
+  ],
+  "predefinedReports": [
+    {
+      "id": "rep-001",
+      "title": "Student Level Report",
+      "description": "Detailed financial report for individual students including payment history and outstanding balances.",
+      "lastGenerated": "2025-12-15T10:30:00Z",
+      "frequency": "On Demand"
+    },
+    {
+      "id": "rep-002",
+      "title": "Faculty Level Report",
+      "description": "Summary of financial data by faculty, including total collected and outstanding amounts.",
+      "lastGenerated": "2025-12-14T09:15:00Z",
+      "frequency": "Weekly"
+    },
+    {
+      "id": "rep-003",
+      "title": "University Level Report",
+      "description": "Comprehensive financial overview of the entire university's fee collection status.",
+      "lastGenerated": "2025-12-01T14:00:00Z",
+      "frequency": "Monthly"
+    },
+    {
+      "id": "rep-004",
+      "title": "Finance Overview",
+      "description": "Dashboard-style report with key financial metrics and visualizations.",
+      "lastGenerated": "2025-12-18T08:45:00Z",
+      "frequency": "Daily"
+    }
+  ],
+  "savedReports": [
+    {
+      "id": "saved-001",
+      "title": "Q4 2025 Financial Summary",
+      "type": "Financial Summary",
+      "lastAccessed": "2025-12-10T16:20:00Z",
+      "createdBy": "admin@university.edu"
+    },
+    {
+      "id": "saved-002",
+      "title": "Engineering Faculty - Outstanding Fees",
+      "type": "Faculty Report",
+      "lastAccessed": "2025-12-05T11:10:00Z",
+      "createdBy": "finance@university.edu"
+    }
+  ],
+  "reportTemplates": [
+    {
+      "id": "temp-001",
+      "name": "Default Financial Report",
+      "description": "Standard template for financial reports with university branding.",
+      "createdAt": "2025-01-15T00:00:00Z"
+    },
+    {
+      "id": "temp-002",
+      "name": "Executive Summary",
+      "description": "Condensed report template for executive review.",
+      "createdAt": "2025-03-22T00:00:00Z"
+    }
+  ]
+}
