@@ -41,10 +41,15 @@ def require_admin(fn):
 # Description: List all available courses
 # ============================================================================
 @courses_bp.route("", methods=["GET"])
+@jwt_required(optional=True)
 def list_courses():
     """
-    List all available courses.
+    List all available courses, optionally filtered by faculty.
+    If the user is authenticated and is a student, only show courses from their faculty.
     
+    Query Parameters:
+        faculty_id (int, optional): Filter courses by faculty ID
+        
     Returns:
     {
         "total_courses": 3,
@@ -55,29 +60,40 @@ def list_courses():
                 "name": "Computer Science",
                 "credits": 3,
                 "total_fee": 5000.0,
-                "description": "Introduction to Computer Science"
+                "description": "Introduction to Computer Science",
+                "faculty": {
+                    "id": 1,
+                    "name": "Computer and Information Sciences",
+                    "code": "CIS"
+                }
             }
         ]
     }
     """
     try:
-        courses = Course.query.all()
+        faculty_id = request.args.get('faculty_id', type=int)
+        query = Course.query
         
-        course_list = [
-            {
-                "id": c.id,
-                "course_id": c.course_id,
-                "name": c.name,
-                "credits": c.credits,
-                "total_fee": c.total_fee,
-                "description": c.description
-            }
-            for c in courses
-        ]
+        # If faculty_id is provided in query params, filter by it
+        if faculty_id:
+            query = query.filter_by(faculty_id=faculty_id)
+        # If user is authenticated and is a student, filter by their faculty
+        else:
+            try:
+                identity = get_jwt_identity()
+                if identity:
+                    user = User.query.get(identity)
+                    if user and not user.is_admin and user.faculty_id:
+                        query = query.filter_by(faculty_id=user.faculty_id)
+            except Exception as e:
+                print(f"Error checking user faculty: {str(e)}")
+                # Continue without faculty filter if there's an error
+        
+        courses = query.all()
         
         return jsonify({
             "total_courses": len(courses),
-            "courses": course_list
+            "courses": [course.to_dict(include_faculty=True) for course in courses]
         }), 200
     
     except Exception as e:
@@ -265,10 +281,9 @@ def delete_course(course_id, current_user=None):
     }
     """
     try:
-        course = Course.query.get(course_id)
-        if not course:
-            return jsonify({"error": "Course not found"}), 404
+        course = Course.query.get_or_404(course_id)
         
+        # Delete the course
         db.session.delete(course)
         db.session.commit()
         
@@ -276,7 +291,7 @@ def delete_course(course_id, current_user=None):
             "msg": "Course deleted successfully",
             "course_id": course_id
         }), 200
-    
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Failed to delete course: {str(e)}"}), 500

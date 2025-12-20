@@ -21,28 +21,117 @@ const CourseRegistration = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [coursesData, statusData, paymentData] = await Promise.all([
-        studentService.getCourses(),
-        studentService.getDashboardStatus(),
-        studentService.getPaymentHistory()
-      ]);
+      setError(null);
       
-      const allCourses = coursesData.courses || [];
-      setCourses(allCourses);
-      
-      const enrolledIds = statusData.enrollments.map(e => e.course_id);
-      setEnrolledCourseIds(enrolledIds);
-      
-      // Check if student has made any payments
-      const paymentCount = paymentData.payments?.length || 0;
-      setHasPayments(paymentCount > 0);
-      
-      // Clear selections that are now enrolled (in case of re-fetch after submit)
-      setSelectedCourses(prev => prev.filter(c => !enrolledIds.includes(c.id)));
+      // Check for authentication token
+      const token = localStorage.getItem('token');
+      console.log('Auth token exists:', !!token);
+      if (!token) {
+        throw { message: 'Please log in to view courses', status: 401 };
+      }
+
+      try {
+        // Get dashboard status to fetch faculty and enrolled courses
+        console.log('Fetching dashboard status...');
+        const statusData = await studentService.getDashboardStatus().catch(err => {
+          console.warn('Error fetching dashboard status:', err);
+          return { enrollments: [] };
+        });
+        console.log('Dashboard status data:', statusData);
+
+        // Get faculty ID from status data
+        const facultyId = statusData?.faculty?.id || 
+                         statusData?.user?.faculty_id || 
+                         (statusData?.user?.faculty ? statusData.user.faculty.id : null);
+        
+        console.log('Extracted faculty ID:', facultyId);
+        
+        // Fetch courses - handle both with and without faculty ID
+        console.log('Fetching courses...');
+        let coursesData = [];
+        
+        try {
+          // First try with faculty ID if available
+          if (facultyId) {
+            try {
+              coursesData = await studentService.getCourses(facultyId);
+            } catch (facultyError) {
+              console.warn('Error fetching courses with faculty filter, trying without filter...', facultyError);
+              // Fall back to fetching all courses if faculty-specific fetch fails
+              coursesData = await studentService.getCourses(null);
+            }
+          } else {
+            // If no faculty ID, try fetching all courses
+            coursesData = await studentService.getCourses(null);
+          }
+        } catch (error) {
+          console.error('Error fetching courses:', error);
+          // If we get here, both attempts failed
+          setError('Failed to load courses. Please try again later.');
+          setCourses([]);
+          return;
+        }
+        console.log('Courses data received:', coursesData);
+        
+        // Update courses state
+        const coursesArray = Array.isArray(coursesData) ? coursesData : [];
+        console.log(`Setting ${coursesArray.length} courses`);
+        setCourses(coursesArray);
+        
+        // Update enrolled courses
+        if (statusData.enrollments) {
+          const enrolledIds = statusData.enrollments.map(e => e.course_id);
+          console.log('Enrolled Course IDs:', enrolledIds);
+          setEnrolledCourseIds(enrolledIds);
+          
+          // Clear any selected courses that are now enrolled
+          setSelectedCourses(prev => prev.filter(c => !enrolledIds.includes(c.id)));
+        }
+        
+        // Check for payments
+        console.log('Fetching payment history...');
+        const paymentData = await studentService.getPaymentHistory().catch(err => {
+          console.warn('Error fetching payment history:', err);
+          return { payments: [] };
+        });
+        console.log('Payment data:', paymentData);
+        setHasPayments(paymentData.payments?.length > 0);
+        
+      } catch (err) {
+        console.error('Error in fetchData:', err);
+        
+        if (err.status === 401 || err.response?.status === 401) {
+          localStorage.removeItem('token');
+          throw { 
+            message: 'Your session has expired. Please log in again.',
+            status: 401
+          };
+        }
+        
+        // For server errors, try to continue with empty data
+        if (err.response?.status === 500) {
+          console.warn('Server error, continuing with empty course list');
+          setCourses([]);
+          setEnrolledCourseIds([]);
+          return;
+        }
+        
+        throw err; // Re-throw other errors
+      }
 
     } catch (err) {
-      setError('Failed to load courses. Please try again.');
-      console.error(err);
+      console.error('Error in fetchData:', err);
+      if (err.response?.status === 500) {
+        setError('Authentication error. Please try logging in again.');
+        // Optionally clear the token and redirect to login
+        localStorage.removeItem('token');
+        // navigate('/login');
+      } else if (err.message === 'Network Error') {
+        setError('Cannot connect to the server. Please check your connection.');
+      } else {
+        setError('Failed to load courses. Please try again later.');
+      }
+      setCourses([]); // Clear courses to show empty state
     } finally {
       setLoading(false);
     }
@@ -54,6 +143,17 @@ const CourseRegistration = () => {
       if (isSelected) {
         return prev.filter(c => c.id !== course.id);
       } else {
+        // Check if already enrolled
+        if (enrolledCourseIds.includes(course.id)) {
+          message.warning('You are already enrolled in this course');
+          return prev;
+        }
+        // Check credit limit
+        const currentCredits = selectedCourses.reduce((sum, c) => sum + (c.credits || 0), 0);
+        if (currentCredits + (course.credits || 0) > creditLimit) {
+          message.error(`Cannot exceed credit limit of ${creditLimit} credits`);
+          return prev;
+        }
         return [...prev, course];
       }
     });
@@ -65,33 +165,42 @@ const CourseRegistration = () => {
     setDropLoading(courseId);
     try {
       await studentService.dropCourse(courseId);
-      // Remove from enrolled list locally
+      // Remove from enrolled list and refresh data
       setEnrolledCourseIds(prev => prev.filter(id => id !== courseId));
-      setSuccess('Course dropped successfully.');
-      setTimeout(() => setSuccess(false), 3000);
+      message.success('Course dropped successfully');
+      
+      // Refresh data to ensure consistency
+      await fetchData();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to drop course.');
+      console.error('Drop course error:', err);
+      message.error(err.response?.data?.error || 'Failed to drop course');
     } finally {
-      setDropLoading(null);
+      setDropLoading(false);
     }
   };
 
   const calculateTotalCredits = () => {
-    return selectedCourses.reduce((sum, course) => sum + course.credits, 0);
+    return selectedCourses.reduce((sum, course) => sum + (course.credits || 0), 0);
   };
 
   const calculateTotalFees = () => {
-    return selectedCourses.reduce((sum, course) => sum + course.total_fee, 0);
+    return selectedCourses.reduce((sum, course) => sum + (course.total_fee || 0), 0);
   };
 
   const handleSubmitRegistration = async () => {
     if (selectedCourses.length === 0) {
-      setError('Please select at least one course to register.');
+      message.warning('Please select at least one course to register');
       return;
     }
 
-    if (calculateTotalCredits() > 18) {
-      setError('Maximum 18 credits per semester allowed.');
+    const totalCredits = calculateTotalCredits();
+    if (totalCredits > creditLimit) {
+      message.error(`Maximum ${creditLimit} credits per semester allowed`);
+      return;
+    }
+
+    if (!hasPayments) {
+      message.warning('Please complete your payment before registering for courses');
       return;
     }
 
@@ -100,21 +209,22 @@ const CourseRegistration = () => {
 
     try {
       // Enroll in each selected course
-      for (const course of selectedCourses) {
-        await studentService.enrollCourse(course.id);
-      }
-      setSuccess('Registration successful!');
+      const enrollPromises = selectedCourses.map(course => 
+        studentService.enrollCourse(course.id)
+      );
+      
+      await Promise.all(enrollPromises);
+      
+      message.success('Registration successful!');
       setSelectedCourses([]);
       
-      // Refresh Data to sync state
+      // Refresh data to sync with server
       await fetchData();
-      
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to register courses. Please try again.');
-      console.error(err);
+      console.error('Enrollment error:', err);
+      const errorMessage = err.response?.data?.error || 'Failed to complete registration';
+      setError(errorMessage);
+      message.error(errorMessage);
     } finally {
       setSubmitting(false);
     }

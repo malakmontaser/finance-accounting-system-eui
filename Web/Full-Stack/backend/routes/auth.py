@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User
+from models import db, User, Faculty  # Added Faculty to imports
 from flask_jwt_extended import create_access_token
 from datetime import datetime
 
@@ -10,7 +10,7 @@ auth_bp = Blueprint("auth", __name__)
 # ENDPOINT: POST /api/auth/register
 # Description: User registration for students
 # ============================================================================
-@auth_bp.route("/register", methods=["POST"])
+@auth_bp.route('/register', methods=['POST'])
 def register():
     """
     Register a new student user.
@@ -19,52 +19,87 @@ def register():
     {
         "username": "student_username",
         "email": "student@example.com",
-        "password": "secure_password"
+        "password": "secure_password",
+        "first_name": "John",
+        "last_name": "Doe",
+        "faculty_code": "CIS"  // Optional: Code of the faculty to assign (e.g., "CIS", "DAD", "BI", "ENG")
     }
     
     Returns:
     {
         "msg": "User registered successfully",
         "user_id": 1,
-        "username": "student_username"
+        "username": "student_username",
+        "faculty": {
+            "id": 1,
+            "name": "Computer and Information Science",
+            "code": "CIS"
+        }
     }
     """
     data = request.get_json()
     
     # Validate required fields
-    if not data or not data.get("username") or not data.get("password"):
-        return jsonify({"error": "Username and password are required"}), 400
+    required_fields = ["username", "email", "password", "first_name", "last_name"]
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
     
     username = data.get("username").strip()
-    email = data.get("email", "").strip() if data.get("email") else None
+    email = data.get("email").strip()
     password = data.get("password")
+    first_name = data.get("first_name").strip()
+    last_name = data.get("last_name").strip()
+    faculty_code = data.get("faculty_code")  
     
-    # Check if user already exists
+    # Check if username or email already exists
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already exists"}), 409
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "Email already in use"}), 409
     
-    if email and User.query.filter_by(email=email).first():
-        return jsonify({"error": "Email already registered"}), 409
+    # Validate faculty if provided
+    faculty = None
+    if faculty_code:
+        faculty = Faculty.query.filter_by(code=faculty_code.upper()).first()
+        if not faculty:
+            return jsonify({"error": "Invalid faculty code"}), 400
     
     try:
         # Create new user
-        new_user = User(
+        user = User(
             username=username,
             email=email,
-            password_hash=User.generate_hash(password),
-            is_admin=False,  # Default to student
-            dues_balance=0.0
+            first_name=first_name,
+            last_name=last_name,
+            is_admin=False,
+            faculty_id=faculty.id if faculty else None
         )
+        user.set_password(password)
         
-        db.session.add(new_user)
+        db.session.add(user)
         db.session.commit()
         
-        return jsonify({
+        # Generate access token
+        access_token = create_access_token(identity=user.id)
+        
+        # Prepare response
+        response_data = {
             "msg": "User registered successfully",
-            "user_id": new_user.id,
-            "username": new_user.username
-        }), 201
-    
+            "user_id": user.id,
+            "username": user.username,
+            "access_token": access_token
+        }
+        
+        # Include faculty info in response if available
+        if faculty:
+            response_data["faculty"] = {
+                "id": faculty.id,
+                "name": faculty.name,
+                "code": faculty.code
+            }
+        
+        return jsonify(response_data), 201
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Registration failed: {str(e)}"}), 500
@@ -106,7 +141,7 @@ def login():
     user = User.query.filter_by(username=username).first()
     
     # Verify credentials
-    if not user or not User.verify_hash(password, user.password_hash):
+    if not user or not user.verify_password(password):
         return jsonify({"error": "Invalid username or password"}), 401
     
     try:

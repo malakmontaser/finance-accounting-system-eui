@@ -19,14 +19,16 @@
                   "if (pm.response.code === 201) {",
                   "    var jsonData = pm.response.json();",
                   "    pm.environment.set('student_id', jsonData.user_id);",
+                  "    pm.environment.set('access_token', jsonData.access_token);",
+                  "    if (jsonData.faculty) {",
+                  "        pm.environment.set('faculty_id', jsonData.faculty.id);",
+                  "    }",
                   "}"
                 ],
-                "type": "text/javascript",
-                "id": "c80c57c8-4c08-4100-a398-b03112529a9f"
+                "type": "text/javascript"
               }
             }
           ],
-          "id": "9f458b01-0b41-4cdb-a880-cd6b046c2236",
           "request": {
             "method": "POST",
             "header": [
@@ -37,18 +39,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"teststudent\",\n    \"email\": \"teststudent@example.com\",\n    \"password\": \"test123\"\n}"
+              "raw": "{\n    \"username\": \"teststudent\",\n    \"email\": \"teststudent@example.com\",\n    \"password\": \"test123\",\n    \"first_name\": \"Test\",\n    \"last_name\": \"Student\",\n    \"faculty_id\": 1\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/auth/register",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "register"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
             }
           }
         },
