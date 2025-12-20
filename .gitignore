@@ -1,0 +1,4 @@
+Web/Full-Stack/backend/migrations/versions/f754ff1458d2_initial_migration.py
+Web/Full-Stack/backend/migrations/versions/b06f57f03311_add_faculties_and_update_relationships.py
+Web/Full-Stack/backend/migrations/versions/0bb6a8879c7c_add_first_name_and_last_name_to_user_.py
+Web/Full-Stack/backend/migrations/versions/f8d12c6c8a32_initial.py
