@@ -87,6 +87,35 @@ const PaymentHistory = () => {
 
   const filteredPayments = getFilteredPayments();
 
+  const handleExport = () => {
+    // Basic CSV export
+    const headers = ['Transaction ID', 'Date', 'Amount', 'Method', 'Status'];
+    const rows = filteredPayments.map(p => {
+      const dateStr = new Date(p.payment_date).toLocaleDateString('en-US');
+      const method = p.payment_method === 'ONLINE' ? 'Credit Card' : 
+                     p.payment_method === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Manual / Cash';
+      return [
+        `TXN-${p.id.toString().padStart(6, '0')}`,
+        dateStr,
+        `$${p.amount}`,
+        method,
+        p.status
+      ];
+    });
+    
+    let csvContent = "data:text/csv;charset=utf-8," 
+        + headers.join(",") + "\n" 
+        + rows.map(e => e.join(",")).join("\n");
+        
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "payment_history.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <DashboardLayout>
       <div className="payment-history-container">
@@ -96,6 +125,12 @@ const PaymentHistory = () => {
             <h1 className="history-page-title">Payment History</h1>
             <p className="history-page-subtitle">View all your past transactions</p>
           </div>
+          <button className="export-btn" onClick={handleExport}>
+            <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
+          </button>
         </div>
 
         {error && (

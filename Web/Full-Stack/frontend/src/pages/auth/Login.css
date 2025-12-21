@@ -133,6 +133,53 @@
   box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-input-wrapper .form-input {
+  padding-right: 3rem;
+}
+
+/* Hide browser's default password reveal button */
+.password-input-wrapper .form-input::-ms-reveal,
+.password-input-wrapper .form-input::-ms-clear {
+  display: none;
+}
+
+.password-input-wrapper .form-input::-webkit-credentials-auto-fill-button,
+.password-input-wrapper .form-input::-webkit-contacts-auto-fill-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: color 0.2s;
+}
+
+.password-toggle-btn:hover {
+  color: #334155;
+}
+
+.eye-icon {
+  width: 20px;
+  height: 20px;
+}
+
 .back-btn {
   margin-bottom: 1.5rem;
   color: #64748b;

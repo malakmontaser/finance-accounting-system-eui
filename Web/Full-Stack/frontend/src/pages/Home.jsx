@@ -108,7 +108,7 @@ const Home = () => {
       {/* About Section */}
       <section id="about" className="about-section">
         <div className="about-container">
-          <h2 className="section-title">About</h2>
+          <h2 className="about-title">About</h2>
           <p className="about-text">
             Our Finance & Accounting System is designed to streamline your financial processes, 
             providing you with the tools you need to make informed decisions and achieve your financial goals. 

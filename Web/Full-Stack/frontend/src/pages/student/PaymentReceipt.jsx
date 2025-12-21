@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import studentService from '../../services/studentService';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import './PaymentReceipt.css';
 
 const PaymentReceipt = () => {
@@ -89,9 +91,46 @@ const PaymentReceipt = () => {
     window.print();
   };
 
-  const handleDownloadPDF = () => {
-    // Placeholder for PDF download functionality
-    alert('PDF download functionality will be implemented');
+  const handleDownloadPDF = async () => {
+    const element = document.querySelector('.payment-receipt-container');
+    if (!element) return;
+
+    try {
+      // Temporarily hide header actions for clean capture
+      const actionsEl = element.querySelector('.receipt-actions');
+      const originalDisplay = actionsEl ? actionsEl.style.display : '';
+      if (actionsEl) actionsEl.style.display = 'none';
+
+      const canvas = await html2canvas(element, {
+        scale: 2, // Improve quality
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+
+      // Restore actions
+      if (actionsEl) actionsEl.style.display = originalDisplay;
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgWidth = 210; // A4 width mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`Receipt_TXN-${(paymentInfo.payment_id || 'XXXX').toString().padStart(6,'0')}.pdf`);
+      
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      // Ensure UI is restored
+      const actionsEl = element.querySelector('.receipt-actions');
+      if (actionsEl) actionsEl.style.display = 'flex';
+      alert('Could not download PDF. Please try the Print button.');
+    }
   };
 
   if (!paymentInfo) {
@@ -130,14 +169,14 @@ const PaymentReceipt = () => {
             <p className="receipt-page-subtitle">Transaction details and confirmation</p>
           </div>
           <div className="receipt-actions">
-            <button className="action-btn print-btn" onClick={handlePrint}>
-              <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button className="receipt-btn receipt-btn-secondary" onClick={handlePrint}>
+              <svg className="receipt-btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
               Print
             </button>
-            <button className="action-btn download-btn" onClick={handleDownloadPDF}>
-              <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button className="receipt-btn receipt-btn-primary" onClick={handleDownloadPDF}>
+              <svg className="receipt-btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Download PDF

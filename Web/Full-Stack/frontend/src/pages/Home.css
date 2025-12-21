@@ -143,9 +143,12 @@
 /* About Section */
 .about-section {
   padding: 8rem 2rem;
-  background-color: #1e293b; /* White */
+  background-color: #1e293b;
   scroll-margin-top: 100px;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .about-container {
@@ -154,17 +157,29 @@
   text-align: center;
 }
 
+.about-title {
+  font-size: 2rem;
+  margin-bottom: 2.5rem;
+  margin-top: 0;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
 .section-title {
-  font-size: 2.5rem;
-  margin-bottom: 2rem;
-  font-weight: 800;
-  color: #eceef2; /* Dark Navy for White BG */
+  font-size: 3rem;
+  margin-bottom: 2.5rem;
+  margin-top: 0;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
 }
 
 .about-text {
-  color: #eceef2; /* Darker Slate for White BG */
-  font-size: 1.25rem;
-  line-height: 1.9; 
+  color: #e2e8f0;
+  font-size: 1.125rem;
+  line-height: 1.8;
   font-weight: 400;
 }
 

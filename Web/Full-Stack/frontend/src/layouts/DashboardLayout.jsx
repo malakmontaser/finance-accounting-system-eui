@@ -16,8 +16,12 @@ const DashboardLayout = ({ children }) => {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    logout();
-    window.location.replace('/');
+    // Clear auth data immediately (synchronous)
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Force immediate navigation to home (bypasses all React routing)
+    window.location.href = '/';
   };
 
   const toggleSidebar = () => {

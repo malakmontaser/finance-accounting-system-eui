@@ -31,41 +31,52 @@
   gap: 0.75rem;
 }
 
-.action-btn {
+/* Receipt Actions - Reimplemented for Specificity */
+
+.receipt-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem; /* Generous padding */
+  border-radius: 0.75rem; /* Medium-large radius */
+  font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  border: none;
+  border: 1px solid transparent;
+  height: 48px; /* Equal height */
+  white-space: nowrap; /* Prevent wrapping */
+  font-family: inherit; /* Ensure font is inherited */
 }
 
-.print-btn {
-  background-color: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
-}
-
-.print-btn:hover {
-  background-color: #f9fafb;
-}
-
-.download-btn {
+/* Primary - Download PDF (Warm Yellow) */
+.receipt-btn-primary {
   background-color: #fbbf24;
   color: #111827;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-.download-btn:hover {
+.receipt-btn-primary:hover {
   background-color: #f59e0b;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-.btn-icon {
-  width: 18px;
-  height: 18px;
+/* Secondary - Print (White) */
+.receipt-btn-secondary {
+  background-color: white;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+}
+
+.receipt-btn-secondary:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.receipt-btn-icon {
+  width: 20px;
+  height: 20px;
 }
 
 /* Receipt Content */
