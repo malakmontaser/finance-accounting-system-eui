@@ -157,28 +157,32 @@ const StudentDashboard = () => {
                   </button>
                 </div>
               ) : (
-                <div className="courses-container">
-                  <div className="course-list-header">
-                    <div>Course Name</div>
-                    <div>Credits</div>
-                    <div>Tuition Fee</div>
-                    <div>Status</div>
-                  </div>
-                  {enrollments.map((enrollment, index) => (
-                    <div key={index} className="course-item">
-                      <div className="course-name">{enrollment.course_name}</div>
-                      <div className="course-meta-item">
-                        {enrollment.credits || 'N/A'} Credits
-                      </div>
-                      <div className="course-meta-item">
-                        ${enrollment.course_fee?.toLocaleString()}
-                      </div>
-                      <div>
-                        <span className="status-badge">Active</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <table className="courses-table">
+                  <thead>
+                    <tr>
+                      <th>Course Name</th>
+                      <th>Credits</th>
+                      <th>Tuition Fee</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enrollments.map((enrollment, index) => (
+                      <tr key={index}>
+                        <td className="course-name">{enrollment.course_name}</td>
+                        <td className="course-meta-item">
+                          {enrollment.credits || 'N/A'} Credits
+                        </td>
+                        <td className="course-meta-item">
+                          ${enrollment.course_fee?.toLocaleString()}
+                        </td>
+                        <td>
+                          <span className="status-badge">Active</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           </div>

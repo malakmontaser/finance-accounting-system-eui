@@ -205,17 +205,13 @@
   padding: 0; /* Remove padding for edge-to-edge table look */
 }
 
-/* Course Items as a data grid/table */
-.courses-container {
-  display: flex;
-  flex-direction: column;
+/* Course Items as a native table */
+.courses-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-/* Header row for the course list */
-.course-list-header {
-  display: grid;
-  grid-template-columns: 3fr 1.5fr 1.5fr 1fr;
-  gap: 1rem;
+.courses-table th {
   padding: 0.75rem 1.5rem;
   background-color: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
@@ -224,57 +220,51 @@
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  align-items: center;
+  text-align: center; /* Default center for robustness */
 }
 
-.course-list-header > div:nth-child(1) {
+/* Specific alignment for the first column (Course Name) */
+.courses-table th:first-child {
   text-align: left;
+  width: 40%;
 }
 
-.course-list-header > div:nth-child(2),
-.course-list-header > div:nth-child(3) {
+.courses-table th:nth-child(2),
+.courses-table th:nth-child(3),
+.courses-table th:nth-child(4) {
   text-align: center;
+  width: 20%;
 }
 
-.course-list-header > div:nth-child(4) {
-  text-align: center;
-}
-
-.course-item {
-  display: grid;
-  grid-template-columns: 3fr 1.5fr 1.5fr 1fr;
-  gap: 1rem;
+.courses-table td {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #e5e7eb;
-  align-items: center;
   font-size: 0.875rem;
-  transition: background-color 0.15s;
+  vertical-align: middle;
 }
 
-.course-item:last-child {
+/* Remove border from the last row */
+.courses-table tr:last-child td {
   border-bottom: none;
 }
 
-.course-item:hover {
+.courses-table tr:hover {
   background-color: #f9fafb;
-  cursor: default;
 }
 
-.course-name {
+.courses-table td.course-name {
   font-weight: 500;
   color: #111827;
   text-align: left;
 }
 
-.course-meta-item {
+.courses-table td.course-meta-item {
   color: #4b5563;
   text-align: center;
 }
 
-.course-item > div:nth-child(4) {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.courses-table td:last-child {
+  text-align: center;
 }
 
 .status-badge {
@@ -761,10 +751,5 @@
   
   .student-dashboard-content {
     padding: 0;
-  }
-  
-  .course-list-header, .course-item {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
   }
 }
