@@ -122,9 +122,10 @@ const studentService = {
    * @param {number} amount - Payment amount
    * @param {string} paymentMethod - Payment method (ONLINE, MANUAL, etc.)
    * @param {string} referenceNumber - Optional reference number
+   * @param {string} [paymentDate] - Explicit ISO timestamp of payment initiation
    * @returns {Promise<Object>} Payment confirmation
    */
-  makePayment: async (amount, paymentMethod = 'ONLINE', referenceNumber = '', proofFile = null) => {
+  makePayment: async (amount, paymentMethod = 'ONLINE', referenceNumber = '', proofFile = null, paymentDate = null) => {
     try {
       let data;
       
@@ -134,12 +135,14 @@ const studentService = {
         data.append('payment_method', paymentMethod);
         data.append('reference_number', referenceNumber);
         data.append('proof_document', proofFile);
+        if (paymentDate) data.append('payment_date', paymentDate);
         // Axios automatically sets Content-Type to multipart/form-data when data is FormData
       } else {
         data = {
           amount,
           payment_method: paymentMethod,
-          reference_number: referenceNumber
+          reference_number: referenceNumber,
+          payment_date: paymentDate
         };
       }
       

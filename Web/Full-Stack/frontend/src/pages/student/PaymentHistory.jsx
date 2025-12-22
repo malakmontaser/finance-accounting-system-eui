@@ -51,25 +51,18 @@ const PaymentHistory = () => {
   };
 
   const handleViewReceipt = (payment) => {
-    // Navigate to receipt page with payment data
+    // Navigate to receipt page with standardized payment data
     navigate('/student/receipt', {
       state: {
-        paymentData: {
-          amount: payment.amount,
-          remaining_dues: payment.remaining_dues || 0,
-          payment_id: payment.id,
-          payment_method: payment.payment_method
-        },
-        cardLast4: payment.reference_number?.slice(-4) || '****',
-        paymentMethod: payment.payment_method === 'ONLINE' ? 'card' : 'bank',
-        date: new Date(payment.payment_date).toLocaleString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        })
+        payment: {
+            ...payment,
+            initiatedAt: payment.payment_date, // Backend provides this as ISO string
+            paymentMethod: payment.payment_method === 'ONLINE' ? 'card' : 'bank',
+            cardLast4: payment.reference_number?.slice(-4) || '****',
+            isPending: payment.status === 'PENDING',
+            remaining_dues: payment.remaining_dues || 0,
+            payment_id: payment.id
+        }
       }
     });
   };
@@ -214,10 +207,13 @@ const PaymentHistory = () => {
                     <tr key={payment.id}>
                       <td className="transaction-id">TXN-{payment.id.toString().padStart(6, '0')}</td>
                       <td>
-                        {new Date(payment.payment_date).toLocaleDateString('en-US', {
+                        {new Date(payment.payment_date.endsWith('Z') ? payment.payment_date : payment.payment_date + 'Z').toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
-                          year: 'numeric'
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
                         })}
                       </td>
                       <td className="amount">${payment.amount.toLocaleString()}</td>

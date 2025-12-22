@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
-from models import db, User, Course, Enrollment, Payment, Notification
+from models import db, User, Course, Enrollment, Payment, Notification, ActionLog
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from werkzeug.utils import secure_filename
 
@@ -13,7 +13,152 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# ... (enroll_course and drop_course endpoints remain unchanged) ...
+# ============================================================================
+# ENDPOINT: POST /api/students/enroll
+# Description: Enroll a student in a course
+# ============================================================================
+@students_bp.route("/enroll", methods=["POST"])
+@jwt_required()
+def enroll_course():
+    try:
+        identity = get_jwt_identity()
+        if not identity:
+            return jsonify({"error": "Invalid or missing user identity"}), 401
+        
+        student_id = int(identity)
+        data = request.get_json()
+        
+        if not data or "course_id" not in data:
+            return jsonify({"error": "Missing course_id"}), 400
+            
+        course_id = int(data["course_id"])
+        
+        # Verify student
+        student = User.query.get(student_id)
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+            
+        # Verify course
+        course = Course.query.get(course_id)
+        if not course:
+            return jsonify({"error": "Course not found"}), 404
+            
+        # Check if already enrolled
+        existing_enrollment = Enrollment.query.filter_by(
+            student_id=student_id, 
+            course_id=course_id
+        ).first()
+        
+        if existing_enrollment:
+            return jsonify({"error": "Already enrolled in this course"}), 400
+            
+        # Create enrollment
+        enrollment = Enrollment(
+            student_id=student_id,
+            course_id=course_id,
+            course_fee=course.total_fee,
+            status='ACTIVE'
+        )
+        
+        # Update student dues
+        student.dues_balance += course.total_fee
+        student.updated_at = datetime.utcnow()
+        
+        # Create notification
+        notification = Notification(
+            student_id=student_id,
+            notification_type='ENROLLMENT',
+            message=f"You have successfully enrolled in {course.name}. Course fee: ${course.total_fee:.2f}"
+        )
+        
+        # Log action
+        action_log = ActionLog(
+            student_id=student_id,
+            action_type='ENROLLMENT',
+            action_description=f"Student enrolled in {course.name} ({course.course_id})",
+            performed_by=student_id # Self-enrollment
+        )
+        
+        db.session.add(enrollment)
+        db.session.add(notification)
+        db.session.add(action_log)
+        db.session.commit()
+        
+        return jsonify({
+            "msg": "Enrollment successful",
+            "enrollment_id": enrollment.id,
+            "new_balance": student.dues_balance
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Enrollment failed: {str(e)}"}), 500
+
+
+# ============================================================================
+# ENDPOINT: DELETE /api/students/enroll/<course_id>
+# Description: Drop a course for a student
+# ============================================================================
+@students_bp.route("/enroll/<int:course_id>", methods=["DELETE"])
+@jwt_required()
+def drop_course(course_id):
+    try:
+        identity = get_jwt_identity()
+        if not identity:
+            return jsonify({"error": "Invalid user identity"}), 401
+            
+        student_id = int(identity)
+        
+        # Verify student
+        student = User.query.get(student_id)
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+            
+        # Verify enrollment
+        enrollment = Enrollment.query.filter_by(
+            student_id=student_id, 
+            course_id=course_id
+        ).first()
+        
+        if not enrollment:
+            return jsonify({"error": "Enrollment not found"}), 404
+            
+        # Business Rule: Cannot drop if payments have been made?
+        # Check if student has ANY payments 
+        # (Strict rule from guide: "prevents dropping course if !hasPayments" - actually "prevents drop if hasPayments")
+        payment_count = Payment.query.filter_by(student_id=student_id).count()
+        if payment_count > 0:
+            return jsonify({"error": "Cannot drop course after payments have been made. Please contact administration."}), 400
+            
+        # Capture course details for log before deleting
+        course_name = enrollment.course.name if enrollment.course else "Unknown Course"
+        course_fee = enrollment.course_fee
+        
+        # Update dues
+        student.dues_balance -= course_fee
+        if student.dues_balance < 0:
+            student.dues_balance = 0
+            
+        # Create notification
+        notification = Notification(
+            student_id=student_id,
+            notification_type='DROP_COURSE',
+            message=f"You have dropped {course_name}. Balance adjusted by -${course_fee:.2f}"
+        )
+        
+        db.session.delete(enrollment)
+        db.session.add(notification)
+        db.session.commit()
+        
+        return jsonify({
+            "msg": "Course dropped successfully",
+            "new_balance": student.dues_balance
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to drop course: {str(e)}"}), 500
+
 
 # ============================================================================
 # ENDPOINT: POST /api/students/pay
@@ -68,6 +213,16 @@ def make_payment():
             error_msg = f"Payment amount (${amount:.2f}) exceeds outstanding dues (${student.dues_balance:.2f})"
             return jsonify({"error": error_msg}), 400
         
+        # Handle local timestamp from frontend if provided
+        payment_date_str = data.get("payment_date")
+        payment_date = datetime.now(timezone.utc)
+        if payment_date_str:
+            try:
+                # Expecting ISO format from frontend
+                payment_date = datetime.fromisoformat(payment_date_str.replace('Z', '+00:00'))
+            except ValueError:
+                pass # Fallback to now(timezone.utc)
+
         # Handle File Upload
         proof_document = None
         if 'proof_document' in request.files:
@@ -75,8 +230,9 @@ def make_payment():
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 # Create unique filename: timestamp_studentID_filename
-                timestamp =  datetime.now().strftime("%Y%m%d%H%M%S")
-                filename = f"{timestamp}_{student_id}_{filename}"
+                # Use the payment_date for consistency in filename as well
+                ts_filename = payment_date.strftime("%Y%m%d%H%M%S")
+                filename = f"{ts_filename}_{student_id}_{filename}"
                 
                 upload_folder = os.path.join(current_app.root_path, 'uploads', 'payments')
                 if not os.path.exists(upload_folder):
@@ -105,7 +261,8 @@ def make_payment():
                 reference_number=reference_number,
                 status=status,
                 notes=notes,
-                proof_document=proof_document
+                proof_document=proof_document,
+                payment_date=payment_date
             )
             db.session.add(payment)
             

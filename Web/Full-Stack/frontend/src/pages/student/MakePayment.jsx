@@ -125,6 +125,10 @@ const MakePayment = () => {
 
     setProcessing(true);
     setError(null);
+    
+    // Capture the exact moment the user initiated the payment
+    const paymentInitiatedTime = new Date();
+    const isoTimestamp = paymentInitiatedTime.toISOString();
 
     try {
       const isCard = paymentMethod === 'card';
@@ -137,24 +141,20 @@ const MakePayment = () => {
         outstandingBalance,
         methodStr,
         refStr,
-        isCard ? null : proofFile
+        isCard ? null : proofFile,
+        isoTimestamp
       );
 
       // Navigate to receipt page with payment data
       navigate('/student/receipt', { 
         state: { 
-          paymentData: response,
-          cardLast4: isCard ? last4 : null,
-          paymentMethod: methodStr,
-          isPending: !isCard, // Passed to receipt to show pending status
-          date: new Date(response.payment_date).toLocaleString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          })
+          payment: {
+            ...response,
+            initiatedAt: isoTimestamp,
+            paymentMethod: isCard ? 'card' : 'bank',
+            cardLast4: isCard ? last4 : null,
+            isPending: !isCard
+          }
         } 
       });
     } catch (err) {

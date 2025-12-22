@@ -15,77 +15,40 @@ const PaymentReceipt = () => {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
 
   useEffect(() => {
-    const loadPaymentData = async () => {
-      if (location.state?.paymentData) {
-        // If coming from Make Payment page with state
-        const { paymentData, cardLast4, paymentMethod, date } = location.state;
-        
-        // Fetch enrolled courses
-        try {
-          const statusData = await studentService.getDashboardStatus();
-          setEnrolledCourses(statusData.enrollments || []);
-        } catch (err) {
-          console.error('Failed to load courses:', err);
-        }
-        
-        setPaymentInfo({
+    // Strictly rely on navigation state for payment data
+    // Do not fetch or recompute
+    if (location.state?.payment) {
+      const { payment } = location.state;
+      
+      const loadExtras = async () => {
+         try {
+           const statusData = await studentService.getDashboardStatus();
+           setEnrolledCourses(statusData.enrollments || []);
+         } catch (err) {
+           console.error('Failed to load courses:', err);
+         }
+      };
+      
+      loadExtras();
 
-          ...paymentData,
-          cardLast4,
-          paymentMethod,
-          isPending: location.state?.isPending || paymentData.status === 'PENDING',
-          status: paymentData.status,
-          date: date || new Date(paymentData.payment_date).toLocaleString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          })
-        });
-      } else {
-        // Fetch latest payment from backend
-        try {
-          const [history, statusData] = await Promise.all([
-            studentService.getPaymentHistory(),
-            studentService.getDashboardStatus()
-          ]);
-          
-          if (history && history.payments && history.payments.length > 0) {
-            const latestPayment = history.payments[0];
-            setEnrolledCourses(statusData.enrollments || []);
-            setPaymentInfo({
-              amount: latestPayment.amount,
-              remaining_dues: latestPayment.remaining_dues || 0,
-              payment_id: latestPayment.id,
-              payment_method: latestPayment.payment_method,
-              cardLast4: latestPayment.reference_number?.slice(-4) || '****',
-              paymentMethod: latestPayment.payment_method === 'ONLINE' ? 'card' : 'bank',
-              isPending: latestPayment.status === 'PENDING',
-              status: latestPayment.status,
-              date: new Date(latestPayment.payment_date).toLocaleString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              })
-            });
-          } else {
-            // No payments found
-            setPaymentInfo(null);
-          }
-        } catch (err) {
-          console.error('Failed to load payment history:', err);
-          setPaymentInfo(null);
-        }
-      }
-    };
+      setPaymentInfo({
+        ...payment,
+        date: new Date((payment.initiatedAt || payment.payment_date).endsWith('Z') ? (payment.initiatedAt || payment.payment_date) : (payment.initiatedAt || payment.payment_date) + 'Z').toLocaleString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        })
+      });
 
-    loadPaymentData();
-  }, [location]);
+    } else {
+        // Fallback only if accessed directly without state (not recommended flow, but handles edge case)
+        // Ideally should redirect back to history
+        navigate('/student/history'); 
+    }
+  }, [location, navigate]);
 
   const handlePrint = () => {
     window.print();
