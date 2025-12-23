@@ -1,6 +1,7 @@
 from models import db, StudentProfile, Transaction
 from sqlalchemy import func
 
+
 class ReportService:
 
     @staticmethod
@@ -9,7 +10,7 @@ class ReportService:
         total_payments = db.session.query(
             func.sum(Transaction.amount)
         ).filter(Transaction.type == "payment").scalar() or 0
-        
+
         unpaid = StudentProfile.query.filter_by(fees_status="UNPAID").count()
         partial = StudentProfile.query.filter_by(fees_status="PARTIAL").count()
         paid = StudentProfile.query.filter_by(fees_status="PAID").count()

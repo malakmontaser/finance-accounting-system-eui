@@ -8,71 +8,72 @@ Usage:
 
 from app import create_app, db
 from models import User, Course, Enrollment, Payment, Notification, ActionLog, Faculty
-from datetime import datetime, timedelta
+
 from sqlalchemy import text
+
 
 def seed_database():
     """Populate the database with sample data."""
-    
+
     app = create_app()
-    
+
     with app.app_context():
         # Clear existing data
         print("Clearing existing data...")
-        
+
         # Disable foreign key checks and drop all tables manually
         try:
             # Disable foreign key checks temporarily
             db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
             db.session.commit()
-            
+
             # Get all tables in the database
             result = db.session.execute(text("SHOW TABLES"))
             tables = [row[0] for row in result]
-            
+
             # Drop all tables
             for table in tables:
                 print(f"Dropping table '{table}'...")
                 db.session.execute(text(f"DROP TABLE IF EXISTS `{table}`"))
                 db.session.commit()
-            
+
             # Re-enable foreign key checks
             db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
             db.session.commit()
-            
+
             print("All tables dropped successfully.")
-            
+
         except Exception as e:
             print(f"Error during table cleanup: {e}")
             # Make sure to re-enable foreign key checks even if there's an error
             try:
                 db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
                 db.session.commit()
-            except:
+            except Exception:
                 pass
             raise
-        
+
         # Create all tables
         print("Creating all tables...")
         db.create_all()
-        
+
         # Create Faculties
         print("Creating faculties...")
         faculties = [
             Faculty(
                 name="Computer and Information Sciences",
                 code="CIS",
-                description="Faculty of Computer and Information Sciences, offering programs in Computer Science, Software Engineering, and Data Science."
+                description="Faculty of Computer and Information Sciences, offering programs in Computer Science, Software Engineering, and Data Science."  # noqa: E501
             ),
             Faculty(
                 name="Digital Arts and Design",
                 code="DAD",
-                description="Faculty of Digital Arts and Design, focusing on creative digital media, animation, and design."
+                description="Faculty of Digital Arts and Design, focusing on creative digital media, animation, and design."  # noqa: E501
             ),
             Faculty(
                 name="Business Informatics",
                 code="BI",
-                description="Faculty of Business Informatics, combining business administration with information technology."
+                description="Faculty of Business Informatics, combining business administration with information technology."  # noqa: E501
             ),
             Faculty(
                 name="Engineering",
@@ -82,18 +83,18 @@ def seed_database():
         ]
         db.session.add_all(faculties)
         db.session.commit()
-        
+
         # Get faculty IDs for reference
         cis_faculty = Faculty.query.filter_by(code="CIS").first()
         dad_faculty = Faculty.query.filter_by(code="DAD").first()
         bi_faculty = Faculty.query.filter_by(code="BI").first()
         eng_faculty = Faculty.query.filter_by(code="ENG").first()
-        
+
         if not all([cis_faculty, dad_faculty, bi_faculty, eng_faculty]):
             raise ValueError("Failed to create all required faculties")
-        
+
         print("Seeding database with sample data...\n")
-        
+
         # ====================================================================
         # Create Sample Users
         # ====================================================================
@@ -108,35 +109,35 @@ def seed_database():
             faculty=None  # Admin doesn't need to be in a faculty
         )
         db.session.add(admin)
-        
+
         # Create Sample Students
         print("Creating sample students...")
         students = []
         faculties = [cis_faculty, dad_faculty, bi_faculty, eng_faculty]
-        
+
         for i in range(1, 11):
             # Distribute students across faculties
             faculty = faculties[i % len(faculties)]
             student = User(
                 username=f"student{i}",
                 email=f"student{i}@example.com",
-                password_hash=User.generate_hash(f"pass123"),
+                password_hash=User.generate_hash("pass123"),
                 is_admin=False,
                 faculty=faculty,
                 dues_balance=float(1000 - (i * 50))  # Vary the dues balance
             )
             students.append(student)
         db.session.add_all(students)
-        
+
         db.session.commit()
         print(f"✓ Created 1 admin and {len(students)} student users")
-        
+
         # ====================================================================
         # Create Sample Courses
         # ====================================================================
         print("Creating sample courses...")
         courses = []
-        
+
         # CIS Courses
         cis_courses = [
             Course(
@@ -164,7 +165,7 @@ def seed_database():
                 description="Design and implementation of database systems"
             )
         ]
-        
+
         # DAD Courses
         dad_courses = [
             Course(
@@ -184,7 +185,7 @@ def seed_database():
                 description="Creating 3D animations using industry-standard software"
             )
         ]
-        
+
         # BI Courses
         bi_courses = [
             Course(
@@ -204,7 +205,7 @@ def seed_database():
                 description="Overview of enterprise resource planning systems"
             )
         ]
-        
+
         # Engineering Courses
         eng_courses = [
             Course(
@@ -224,35 +225,34 @@ def seed_database():
                 description="Fundamentals of energy and thermodynamics"
             )
         ]
-        
+
         # Add all courses to the list
         courses.extend(cis_courses)
         courses.extend(dad_courses)
         courses.extend(bi_courses)
         courses.extend(eng_courses)
         db.session.add_all(courses)
-        
+
         db.session.commit()
         print(f"✓ Created {len(courses)} courses")
-        
+
         # ====================================================================
         # Create Sample Enrollments
         # ====================================================================
         print("\nCreating enrollments...")
-        
+
         enrollments = []
-        import random
-        
+
         for student in students:
             # Get courses for this student's faculty
             faculty_courses = [c for c in courses if c.faculty_id == student.faculty_id]
-            
+
             if faculty_courses:
                 # Enroll in 1 to all available courses for their faculty
                 # For deterministic seeding, let's just pick the first 1-2 courses
                 num_courses = min(len(faculty_courses), 2)
                 courses_to_enroll = faculty_courses[:num_courses]
-                
+
                 for course in courses_to_enroll:
                     enrollments.append(
                         Enrollment(
@@ -262,31 +262,31 @@ def seed_database():
                             status='ACTIVE'
                         )
                     )
-        
+
         # Add manually specified complex enrollments for specific testing scenarios if needed
         # But for now, the dynamic logic above covers all students correctly.
-        
+
         for enrollment in enrollments:
             db.session.add(enrollment)
-        
+
         db.session.commit()
         print(f"✓ Created {len(enrollments)} enrollments")
-        
+
         # Update student dues_balance based on enrollments
         for student in students:
             total_dues = sum(
                 e.course_fee for e in Enrollment.query.filter_by(student_id=student.id).all()
             )
             student.dues_balance = total_dues
-        
+
         db.session.commit()
         print("✓ Updated student dues_balance")
-        
+
         # ====================================================================
         # Create Sample Payments
         # ====================================================================
         print("\nCreating payments...")
-        
+
         payments = [
             # Student 1 paid 4000 (owes 5000)
             Payment(
@@ -339,13 +339,13 @@ def seed_database():
                 notes="Online payment received"
             ),
         ]
-        
+
         for payment in payments:
             db.session.add(payment)
-        
+
         db.session.commit()
         print(f"✓ Created {len(payments)} payments")
-        
+
         # Update student dues_balance based on payments
         for student in students:
             total_paid = sum(
@@ -355,15 +355,15 @@ def seed_database():
                 e.course_fee for e in Enrollment.query.filter_by(student_id=student.id).all()
             )
             student.dues_balance = max(0, total_fees - total_paid)
-        
+
         db.session.commit()
         print("✓ Updated student dues_balance after payments")
-        
+
         # ====================================================================
         # Create Sample Notifications
         # ====================================================================
         print("\nCreating notifications...")
-        
+
         notifications = [
             Notification(
                 student_id=students[0].id,
@@ -391,18 +391,18 @@ def seed_database():
                 message="Payment of $2500.00 received. Remaining dues: $2500.00"
             ),
         ]
-        
+
         for notification in notifications:
             db.session.add(notification)
-        
+
         db.session.commit()
         print(f"✓ Created {len(notifications)} notifications")
-        
+
         # ====================================================================
         # Create Sample Action Logs
         # ====================================================================
         print("\nCreating action logs...")
-        
+
         action_logs = [
             ActionLog(
                 student_id=students[0].id,
@@ -423,20 +423,20 @@ def seed_database():
                 performed_by=admin.id
             ),
         ]
-        
+
         for action_log in action_logs:
             db.session.add(action_log)
-        
+
         db.session.commit()
-        print(f"✓ Created {len(action_logs)} action logs")
-        
+        print(f"Created {len(action_logs)} logs")
+
         # ====================================================================
         # Print Summary
         # ====================================================================
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("DATABASE SEEDING COMPLETED SUCCESSFULLY")
-        print("="*60)
-        
+        print("=" * 60)
+
         print("\nSample Credentials:")
         print("-" * 60)
         print("Admin User:")
@@ -447,19 +447,19 @@ def seed_database():
         print("Student Users:")
         for i, student in enumerate(students, 1):
             print(f"  {i}. Username: {student.username}")
-            print(f"     Password: pass123")
+            print("     Password: pass123")
             print(f"     Email: {student.email}")
             print(f"     Dues Balance: ${student.dues_balance:.2f}")
             print()
-        
+
         print("Sample Courses:")
         print("-" * 60)
         for course in courses:
             print(f"  {course.course_id}: {course.name} (${course.total_fee:.2f})")
-        
-        print("\n" + "="*60)
+
+        print("\n" + "=" * 60)
         print("You can now start the Flask application and test the API")
-        print("="*60)
+        print("=" * 60)
 
 
 if __name__ == "__main__":

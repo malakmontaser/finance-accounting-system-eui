@@ -5,27 +5,28 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 
+
 def create_app(config_updates=None):
     """
     Application factory function that creates and configures the Flask app.
     """
     app = Flask(__name__)
     app.config.from_object(Config)
-    
+
     if config_updates:
         app.config.update(config_updates)
-    
+
     # Enable CORS for cross-origin requests
     CORS(app)
-    
+
     # Initialize database
     db.init_app(app)
-    
+
     # Initialize migrations
-    migrate = Migrate(app, db)
-    
+    Migrate(app, db)
+
     # Initialize JWT authentication
-    jwt = JWTManager(app)
+    JWTManager(app)
 
     # ========================================================================
     # Health Check Endpoint
@@ -48,13 +49,13 @@ def create_app(config_updates=None):
 
     # Authentication routes
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    
+
     # Student routes
     app.register_blueprint(students_bp, url_prefix="/api/students")
-    
+
     # Finance department routes
     app.register_blueprint(finance_bp, url_prefix="/api/finance")
-    
+
     # Course management routes
     app.register_blueprint(courses_bp, url_prefix="/api/courses")
 

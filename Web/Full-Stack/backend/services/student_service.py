@@ -1,5 +1,6 @@
 from models import db, Transaction, StudentProfile
 
+
 class PaymentService:
 
     @staticmethod

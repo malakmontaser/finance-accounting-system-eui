@@ -1,34 +1,37 @@
-from flask import Blueprint, request, jsonify, send_file, Response, current_app
-from models import db, User, Payment, Enrollment, Notification, ActionLog, Course, FeeStructure, BankTransaction, GeneratedReport, Penalty  # alyan's modification: Added Course, FeeStructure, BankTransaction, GeneratedReport, and Penalty imports
+from flask import Blueprint, request, jsonify, Response, current_app
+from models import (
+    db, User, Payment, Enrollment, Notification, ActionLog,
+    Course, FeeStructure, BankTransaction, GeneratedReport, Penalty
+)
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import and_, func, desc, cast, String
+from sqlalchemy import and_, func, desc
 from functools import wraps
 import json
-import os
-import uuid
 
 finance_bp = Blueprint("finance", __name__)
 
 
 # ============================================================================
 # HELPER FUNCTION: Check if user is admin (RBAC)
+
+
 # ============================================================================
 def require_admin(fn):
     """Decorator to enforce admin-only access."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
         from models import User
-        
+
         identity = get_jwt_identity()
         if not identity:
             return jsonify({"error": "Authentication required"}), 401
-            
+
         # Get user from database to check admin status
         user = User.query.get(identity)
         if not user or not user.is_admin:
             return jsonify({"error": "Admin access required"}), 403
-            
+
         return fn(*args, **kwargs)
     return wrapper
 
@@ -36,6 +39,8 @@ def require_admin(fn):
 # ============================================================================
 # ENDPOINT: GET /api/finance/dues
 # Description: Lists all students with outstanding dues (Tuition fees calculation)
+
+
 # ============================================================================
 @finance_bp.route("/dues", methods=["GET"])
 @jwt_required()
@@ -43,12 +48,12 @@ def require_admin(fn):
 def get_outstanding_dues():
     """
     Lists all students with outstanding dues. Finance Department only.
-    
+
     Query Parameters:
     - min_amount: Filter students with dues >= min_amount (optional)
     - max_amount: Filter students with dues <= max_amount (optional)
     - sort_by: Sort by 'dues_balance' or 'username' (default: 'dues_balance')
-    
+
     Returns:
     {
         "total_students_with_dues": 5,
@@ -70,37 +75,37 @@ def get_outstanding_dues():
         min_amount = request.args.get('min_amount', type=float)
         max_amount = request.args.get('max_amount', type=float)
         sort_by = request.args.get('sort_by', 'dues_balance')
-        
+
         # Query students with outstanding dues
-        query = User.query.filter(User.dues_balance > 0, User.is_admin == False)
-        
+        query = User.query.filter(User.dues_balance > 0, User.is_admin is False)
+
         # Apply filters
         if min_amount is not None:
             query = query.filter(User.dues_balance >= min_amount)
         if max_amount is not None:
             query = query.filter(User.dues_balance <= max_amount)
-        
+
         # Apply sorting
         if sort_by == 'username':
             query = query.order_by(User.username)
         else:
             query = query.order_by(User.dues_balance.desc())
-        
+
         students = query.all()
-        
+
         # Build response
         student_list = []
         total_outstanding = 0
-        
+
         for student in students:
             # Get last payment date
             last_payment = Payment.query.filter_by(student_id=student.id).order_by(
                 Payment.payment_date.desc()
             ).first()
-            
+
             # Count enrollments
             enrollment_count = Enrollment.query.filter_by(student_id=student.id).count()
-            
+
             student_list.append({
                 "user_id": student.id,
                 "username": student.username,
@@ -109,15 +114,15 @@ def get_outstanding_dues():
                 "total_enrollments": enrollment_count,
                 "last_payment_date": last_payment.payment_date.isoformat() if last_payment else None
             })
-            
+
             total_outstanding += student.dues_balance
-        
+
         return jsonify({
             "total_students_with_dues": len(students),
             "total_outstanding_amount": total_outstanding,
             "students": student_list
         }), 200
-    
+
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve dues: {str(e)}"}), 500
 
@@ -125,6 +130,8 @@ def get_outstanding_dues():
 # ============================================================================
 # ENDPOINT: GET /api/finance/unpaid-report
 # Description: Generates a report of students with dues_balance > 0
+
+
 # ============================================================================
 @finance_bp.route("/unpaid-report", methods=["GET"])
 @jwt_required()
@@ -133,7 +140,7 @@ def get_unpaid_report():
     """
     Generates a detailed report of students with outstanding dues.
     Used for 'Action based on unpaid report'.
-    
+
     Returns:
     {
         "report_date": "2025-12-05T15:30:00",
@@ -152,7 +159,7 @@ def get_unpaid_report():
         # alyan's modification: Added error handling for initial query
         try:
             students = User.query.filter(
-                and_(User.dues_balance > 0, User.is_admin == False)
+                and_(User.dues_balance > 0, User.is_admin is False)
             ).order_by(User.dues_balance.desc()).all()
         except Exception as query_err:
             print(f"ERROR: Failed to query students: {str(query_err)}")
@@ -170,15 +177,15 @@ def get_unpaid_report():
                 },
                 "detailed_report": []
             }), 200  # Return empty report instead of error
-        
+
         # Categorize by dues amount
         critical = []  # > 5000
         moderate = []  # 1000 - 5000
         low = []       # < 1000
-        
+
         detailed_report = []
         total_outstanding = 0
-        
+
         for student in students:
             # Get enrollment details with course info
             # alyan's modification: Use outerjoin (LEFT JOIN) to handle students without enrollments
@@ -192,13 +199,13 @@ def get_unpaid_report():
                 ).filter(
                     Enrollment.student_id == student.id
                 ).all()
-                
+
                 for enrollment, course in enrollments_data:
                     try:
                         enrollment_details.append({
                             "course_name": course.name if course and course.name else "Unknown Course",
                             "course_fee": enrollment.course_fee if enrollment else 0.0,
-                            "enrollment_date": enrollment.enrollment_date.isoformat() if enrollment and enrollment.enrollment_date else None
+                            "enrollment_date": enrollment.enrollment_date.isoformat() if enrollment and enrollment.enrollment_date else None  # noqa: E501
                         })
                     except Exception as err:
                         print(f"Warning: Error processing enrollment: {str(err)}")
@@ -221,7 +228,7 @@ def get_unpaid_report():
                 except Exception as fallback_err:
                     print(f"Warning: Fallback query also failed: {str(fallback_err)}")
                     enrollment_details = []
-            
+
             # Get payment history
             # alyan's modification: Added error handling for payment queries
             recent_payments = []
@@ -229,7 +236,7 @@ def get_unpaid_report():
                 payments = Payment.query.filter_by(student_id=student.id).order_by(
                     Payment.payment_date.desc()
                 ).limit(5).all()
-                
+
                 recent_payments = [
                     {
                         "amount": p.amount,
@@ -241,7 +248,7 @@ def get_unpaid_report():
             except Exception as payment_err:
                 print(f"Warning: Error querying payments for student {student.id}: {str(payment_err)}")
                 recent_payments = []
-            
+
             # alyan's modification: Added error handling for student data creation
             try:
                 student_data = {
@@ -263,10 +270,10 @@ def get_unpaid_report():
                     "enrollments": [],
                     "recent_payments": []
                 }
-            
+
             detailed_report.append(student_data)
             total_outstanding += student.dues_balance
-            
+
             # Categorize
             if student.dues_balance > 5000:
                 critical.append(student_data)
@@ -274,7 +281,7 @@ def get_unpaid_report():
                 moderate.append(student_data)
             else:
                 low.append(student_data)
-        
+
         return jsonify({
             "report_date": datetime.now(timezone.utc).isoformat(),
             "total_students": len(students),
@@ -286,7 +293,7 @@ def get_unpaid_report():
             },
             "detailed_report": detailed_report
         }), 200
-    
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -301,6 +308,8 @@ def get_unpaid_report():
 # ============================================================================
 # ENDPOINT: PUT /api/finance/action/contact/<student_id>
 # Description: Logs action: 'Contact the student for the due date'
+
+
 # ============================================================================
 @finance_bp.route("/action/contact/<int:student_id>", methods=["PUT"])
 @jwt_required()
@@ -308,13 +317,13 @@ def get_unpaid_report():
 def contact_student(student_id):
     """
     Log action: Contact the student for outstanding dues.
-    
+
     Request Body:
     {
         "contact_method": "EMAIL",
         "notes": "Sent reminder email about pending dues"
     }
-    
+
     Returns:
     {
         "msg": "Contact action logged successfully",
@@ -326,29 +335,29 @@ def contact_student(student_id):
     identity = get_jwt_identity()
     if not identity:
         return jsonify({"error": "Invalid or missing user identity"}), 401
-        
+
     try:
         admin_id = int(identity)  # Convert string ID to integer
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
-            
+
         contact_method = data.get("contact_method", "EMAIL")
         notes = data.get("notes", "")
-        
+
         # Verify student exists
         student = User.query.get(student_id)
         if not student:
             return jsonify({"error": "Student not found"}), 404
-        
+
         if student.is_admin:
             return jsonify({"error": "Cannot contact admin users"}), 400
-        
+
         # Get admin user for logging
         admin = User.query.get(admin_id)
         if not admin or not admin.is_admin:
             return jsonify({"error": "Admin access required"}), 403
-        
+
         # Create action log
         action_log = ActionLog(
             student_id=student_id,
@@ -356,27 +365,27 @@ def contact_student(student_id):
             action_description=f"Contacted student via {contact_method}. Notes: {notes}",
             performed_by=admin_id
         )
-        
+
         db.session.add(action_log)
-        
+
         # Create notification for student
         notification = Notification(
             student_id=student_id,
             notification_type='CONTACT_REQUEST',
-            message=f"Finance department has contacted you regarding your outstanding dues of ${student.dues_balance:.2f}",
+            message=f"Finance department has contacted you regarding your outstanding dues of ${student.dues_balance:.2f}",  # noqa: E501
             action_date=datetime.now(timezone.utc)
         )
         db.session.add(notification)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Contact action logged successfully",
             "action_id": action_log.id,
             "student_id": student_id,
             "contact_date": action_log.created_at.isoformat()
         }), 201
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Failed to log contact action: {str(e)}"}), 500
@@ -385,6 +394,8 @@ def contact_student(student_id):
 # ============================================================================
 # ENDPOINT: POST /api/finance/record-payment
 # Description: Records and logs a payment transaction if done externally
+
+
 # ============================================================================
 @finance_bp.route("/record-payment", methods=["POST"])
 @jwt_required()
@@ -392,7 +403,7 @@ def contact_student(student_id):
 def record_external_payment():
     """
     Record and log a payment transaction (e.g., bank transfer).
-    
+
     Request Body:
     {
         "student_id": 1,
@@ -401,7 +412,7 @@ def record_external_payment():
         "reference_number": "BANK123456",
         "notes": "Payment received from student bank account"
     }
-    
+
     Returns:
     {
         "msg": "Payment recorded successfully",
@@ -415,26 +426,26 @@ def record_external_payment():
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
-        
+
         # Get admin user ID from JWT
         admin_identity = get_jwt_identity()
         if not admin_identity:
             return jsonify({"error": "Invalid or missing admin identity"}), 401
-            
+
         admin_id = int(admin_identity)
-        
+
         # Validate required fields
         required_fields = ["student_id", "amount"]
         for field in required_fields:
             if field not in data:
                 return jsonify({"error": f"{field} is required"}), 400
-        
+
         student_id = data.get("student_id")
         amount = data.get("amount")
         payment_method = data.get("payment_method", "MANUAL")
         reference_number = data.get("reference_number")
         notes = data.get("notes", "")
-        
+
         # Validate amount
         try:
             amount = float(amount)
@@ -442,15 +453,15 @@ def record_external_payment():
                 return jsonify({"error": "Amount must be greater than 0"}), 400
         except (ValueError, TypeError):
             return jsonify({"error": "Invalid amount"}), 400
-        
+
         # Verify student exists and get current dues
         student = User.query.get(student_id)
         if not student or student.is_admin:
             return jsonify({"error": "Student not found"}), 404
-        
+
         # Start transaction
         db.session.begin_nested()
-        
+
         # Create payment record
         payment = Payment(
             student_id=student_id,
@@ -462,11 +473,11 @@ def record_external_payment():
             recorded_by=admin_id
         )
         db.session.add(payment)
-        
+
         # Update student's dues_balance
         student.dues_balance = max(0, student.dues_balance - amount)
         student.updated_at = datetime.now(timezone.utc)
-        
+
         # Create action log
         action_log = ActionLog(
             student_id=student_id,
@@ -475,7 +486,7 @@ def record_external_payment():
             performed_by=admin_id
         )
         db.session.add(action_log)
-        
+
         # Create notification for student
         notification = Notification(
             student_id=student_id,
@@ -484,9 +495,9 @@ def record_external_payment():
             action_date=datetime.now(timezone.utc)
         )
         db.session.add(notification)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Payment recorded successfully",
             "payment_id": payment.id,
@@ -494,7 +505,7 @@ def record_external_payment():
             "amount": amount,
             "remaining_dues": student.dues_balance
         }), 201
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Failed to record payment: {str(e)}"}), 500
@@ -503,6 +514,8 @@ def record_external_payment():
 # ============================================================================
 # ENDPOINT: GET /api/finance/reports/status
 # Description: Generates 'report condition (Pass & Fail)' based on student Dues + Fees
+
+
 # ============================================================================
 @finance_bp.route("/reports/status", methods=["GET"])
 @jwt_required()
@@ -511,10 +524,10 @@ def get_status_report():
     """
     Generates a status report based on student dues and fees.
     Determines Pass/Fail status based on payment condition.
-    
+
     Query Parameters:
     - threshold: Dues threshold for 'Fail' status (default: 0, meaning any outstanding dues = Fail)
-    
+
     Returns:
     {
         "report_date": "2025-12-05T15:30:00",
@@ -528,18 +541,18 @@ def get_status_report():
     try:
         # Get threshold parameter
         threshold = request.args.get('threshold', default=0, type=float)
-        
+
         # Get all students (excluding admins)
-        students = User.query.filter(User.is_admin == False).all()
-        
+        students = User.query.filter(User.is_admin is False).all()
+
         pass_students = []
         fail_students = []
-        
+
         for student in students:
             # Get enrollment details
             enrollments = Enrollment.query.filter_by(student_id=student.id).all()
             total_fees = sum(e.course_fee for e in enrollments)
-            
+
             student_data = {
                 "user_id": student.id,
                 "username": student.username,
@@ -548,7 +561,7 @@ def get_status_report():
                 "total_fees": total_fees,
                 "total_enrollments": len(enrollments)
             }
-            
+
             # Determine status: Pass if dues <= threshold, Fail otherwise
             if student.dues_balance <= threshold:
                 student_data["status"] = "PASS"
@@ -556,7 +569,7 @@ def get_status_report():
             else:
                 student_data["status"] = "FAIL"
                 fail_students.append(student_data)
-        
+
         return jsonify({
             "report_date": datetime.now(timezone.utc).isoformat(),
             "total_students": len(students),
@@ -566,7 +579,7 @@ def get_status_report():
             "pass_students": pass_students,
             "fail_students": fail_students
         }), 200
-    
+
     except Exception as e:
         return jsonify({"error": f"Failed to generate status report: {str(e)}"}), 500
 
@@ -574,6 +587,8 @@ def get_status_report():
 # ============================================================================
 # ENDPOINT: GET /api/finance/summary
 # Description: Returns overall financial summary statistics for the dashboard
+
+
 # ============================================================================
 @finance_bp.route("/summary", methods=["GET"])
 @jwt_required()
@@ -581,7 +596,7 @@ def get_status_report():
 def get_finance_summary():
     """
     Returns overall financial summary statistics for the dashboard.
-    
+
     Returns:
     {
         "total_collected": 2400000,
@@ -600,23 +615,23 @@ def get_finance_summary():
         total_collected = db.session.query(func.sum(Payment.amount)).filter(
             Payment.status == 'RECEIVED'
         ).scalar() or 0.0
-        
+
         # Pending payments = sum of all dues_balance from students
         pending_payments = db.session.query(func.sum(User.dues_balance)).filter(
-            User.is_admin == False
+            User.is_admin is False
         ).scalar() or 0.0
-        
+
         # Total students = count of all non-admin users
-        total_students = User.query.filter(User.is_admin == False).count()
-        
+        total_students = User.query.filter(User.is_admin is False).count()
+
         # Unpaid students = count of students where dues_balance > 0
         unpaid_students = User.query.filter(
-            and_(User.dues_balance > 0, User.is_admin == False)
+            and_(User.dues_balance > 0, User.is_admin is False)
         ).count()
-        
+
         # Calculate previous period stats (30 days ago) for change percentages
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-        
+
         # Previous period total collected
         prev_total_collected = db.session.query(func.sum(Payment.amount)).filter(
             and_(
@@ -624,35 +639,33 @@ def get_finance_summary():
                 Payment.payment_date < thirty_days_ago
             )
         ).scalar() or 0.0
-        
+
         # Previous period unpaid students
         # Note: We can't get historical unpaid count easily, so we'll use a simple calculation
-        # For now, we'll calculate change based on payment trends
-        prev_unpaid_students = unpaid_students  # Placeholder - would need historical data
-        
+
         # Calculate change percentages
         total_collected_change = 0.0
         if prev_total_collected > 0:
             total_collected_change = ((total_collected - prev_total_collected) / prev_total_collected) * 100
-        
+
         # For pending payments change, we'll use a simple estimate
         # In a real system, you'd track this over time
         pending_payments_change = -8.2  # Placeholder
-        
+
         # For student count change, calculate based on creation dates
         prev_total_students = User.query.filter(
             and_(
-                User.is_admin == False,
+                User.is_admin is False,
                 User.created_at < thirty_days_ago
             )
         ).count()
         total_students_change = 0.0
         if prev_total_students > 0:
             total_students_change = ((total_students - prev_total_students) / prev_total_students) * 100
-        
+
         # Unpaid students change (placeholder)
         unpaid_students_change = -3.1  # Placeholder
-        
+
         return jsonify({
             "total_collected": float(total_collected),
             "total_collected_change": round(total_collected_change, 1),
@@ -663,7 +676,7 @@ def get_finance_summary():
             "unpaid_students": unpaid_students,
             "unpaid_students_change": round(unpaid_students_change, 1)
         }), 200
-    
+
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve finance summary: {str(e)}"}), 500
 
@@ -671,6 +684,8 @@ def get_finance_summary():
 # ============================================================================
 # ENDPOINT: GET /api/finance/payments/recent
 # Description: Returns list of recent payments with student and faculty info
+
+
 # ============================================================================
 @finance_bp.route("/payments/recent", methods=["GET"])
 @jwt_required()
@@ -678,11 +693,11 @@ def get_finance_summary():
 def get_recent_payments():
     """
     Returns list of recent payments with student and faculty info.
-    
+
     Query Parameters:
     - limit: Number of records to return (default: 10)
     - offset: Pagination offset (default: 0)
-    
+
     Returns:
     {
         "payments": [
@@ -703,7 +718,7 @@ def get_recent_payments():
         # Get query parameters
         limit = request.args.get('limit', default=10, type=int)
         offset = request.args.get('offset', default=0, type=int)
-        
+
         # Query recent payments with student info
         payments_query = db.session.query(
             Payment,
@@ -711,17 +726,17 @@ def get_recent_payments():
         ).join(
             User, Payment.student_id == User.id
         ).filter(
-            User.is_admin == False
+            User.is_admin is False
         ).order_by(
             Payment.payment_date.desc()
         )
-        
+
         # Get total count
         total_count = payments_query.count()
-        
+
         # Apply pagination
         payments_data = payments_query.offset(offset).limit(limit).all()
-        
+
         # Build response
         payments_list = []
         for payment, student in payments_data:
@@ -751,17 +766,17 @@ def get_recent_payments():
                         faculty = "Engineering"
                     else:
                         faculty = "Engineering"  # Default
-            
+
             # Format date
             payment_date = payment.payment_date.strftime('%b %d, %Y') if payment.payment_date else 'N/A'
-            
+
             # Determine status
             status = "Paid"
             if payment.status == 'PENDING':
                 status = "Pending"
             elif payment.status == 'FAILED':
                 status = "Failed"
-            
+
             payments_list.append({
                 "id": f"PAY-{payment.id}",  # alyan's modification: Use unique payment ID instead of student ID
                 "payment_id": payment.id,  # alyan's modification: Include actual payment ID
@@ -772,12 +787,12 @@ def get_recent_payments():
                 "date": payment_date,
                 "status": status
             })
-        
+
         return jsonify({
             "payments": payments_list,
             "total_count": total_count
         }), 200
-    
+
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve recent payments: {str(e)}"}), 500
 
@@ -785,6 +800,8 @@ def get_recent_payments():
 # ============================================================================
 # ENDPOINT: GET /api/finance/payments/by-faculty
 # Description: Returns payment collection progress grouped by faculty
+
+
 # ============================================================================
 @finance_bp.route("/payments/by-faculty", methods=["GET"])
 @jwt_required()
@@ -792,7 +809,7 @@ def get_recent_payments():
 def get_payments_by_faculty():
     """
     Returns payment collection progress grouped by faculty/department.
-    
+
     Returns:
     {
         "faculties": [
@@ -815,7 +832,7 @@ def get_payments_by_faculty():
                     return course.faculty
             except AttributeError:
                 pass  # Fall through to name-based mapping
-            
+
             # Fallback: Map course names to faculties (temporary solution)
             course_lower = course.name.lower()
             if 'computer' in course_lower or 'cs' in course_lower:
@@ -830,7 +847,7 @@ def get_payments_by_faculty():
                 return "Engineering"
             else:
                 return "Engineering"  # Default
-        
+
         # Get all enrollments with course info
         # alyan's modification: Added error handling for database query
         try:
@@ -850,7 +867,7 @@ def get_payments_by_faculty():
                 "message": "No enrollment data available or database error",
                 "error": str(query_error)
             }), 200
-        
+
         # Group by faculty
         faculty_data = {}
         faculty_colors = {
@@ -859,10 +876,10 @@ def get_payments_by_faculty():
             "Digital Arts": "#3b82f6",
             "Business Informatics": "#10b981"
         }
-        
+
         for enrollment, course in enrollments:
             faculty = get_faculty_from_course(course)  # alyan's modification: Pass course object instead of name
-            
+
             if faculty not in faculty_data:
                 faculty_data[faculty] = {
                     "name": faculty,
@@ -870,16 +887,16 @@ def get_payments_by_faculty():
                     "total": 0.0,
                     "color": faculty_colors.get(faculty, "#10b981")
                 }
-            
+
             # Add to total expected fees
             faculty_data[faculty]["total"] += enrollment.course_fee
-            
+
             # Get payments for this student
             student_payments = Payment.query.filter_by(
                 student_id=enrollment.student_id,
                 status='RECEIVED'
             ).all()
-            
+
             # Calculate collected amount for this enrollment
             # This is a simplified calculation - in reality, you'd need to track
             # which payments correspond to which enrollments
@@ -889,12 +906,12 @@ def get_payments_by_faculty():
                     student_id=enrollment.student_id
                 ).all()
             )
-            
+
             # Proportionally allocate payments to this enrollment
             if total_fees > 0:
                 enrollment_collected = (enrollment.course_fee / total_fees) * total_paid
                 faculty_data[faculty]["collected"] += enrollment_collected
-        
+
         # Build response with percentages
         faculties_list = []
         for faculty_name, data in faculty_data.items():
@@ -906,14 +923,14 @@ def get_payments_by_faculty():
                 "percentage": round(percentage, 2),
                 "color": data["color"]
             })
-        
+
         # Sort by total (descending)
         faculties_list.sort(key=lambda x: x["total"], reverse=True)
-        
+
         return jsonify({
             "faculties": faculties_list
         }), 200
-    
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -928,6 +945,8 @@ def get_payments_by_faculty():
 # ============================================================================
 # ENDPOINT: GET /api/finance/bank-reconciliation
 # Description: Returns bank transactions with reconciliation status
+
+
 # ============================================================================
 @finance_bp.route("/bank-reconciliation", methods=["GET"])
 @jwt_required()
@@ -935,12 +954,12 @@ def get_payments_by_faculty():
 def get_bank_reconciliation():
     """
     Returns bank transactions with reconciliation status and summary (alyan's modification).
-    
+
     Query Parameters:
     - limit: Number of records to return (default: 50)
     - offset: Pagination offset (default: 0)
     - status: Filter by status ('matched' or 'unmatched') (optional)
-    
+
     Returns:
     {
         "summary": {
@@ -957,36 +976,36 @@ def get_bank_reconciliation():
         limit = request.args.get('limit', default=50, type=int)
         offset = request.args.get('offset', default=0, type=int)
         status_filter = request.args.get('status', type=str)
-        
+
         # Build query
         query = BankTransaction.query
-        
+
         # Apply status filter
         if status_filter:
             if status_filter.lower() == 'matched':
                 query = query.filter(BankTransaction.status == 'Matched')
             elif status_filter.lower() == 'unmatched':
                 query = query.filter(BankTransaction.status == 'Unmatched')
-        
+
         # Get total count before pagination
         total_count = query.count()
-        
+
         # Apply pagination and ordering
         transactions = query.order_by(desc(BankTransaction.transaction_date)).offset(offset).limit(limit).all()
-        
+
         # Calculate summary statistics
         all_transactions = BankTransaction.query.all()
         total_amount = sum(t.amount for t in all_transactions)
         matched_count = sum(1 for t in all_transactions if t.status == 'Matched')
         unmatched_count = sum(1 for t in all_transactions if t.status == 'Unmatched')
         pending_count = sum(1 for t in all_transactions if t.status == 'Pending')
-        
+
         # Format transactions
         transactions_list = []
         for txn in transactions:
             transaction_data = {
                 'id': txn.id,
-                'bank_ref': txn.bank_ref,
+                'bank_re': txn.bank_ref,
                 'amount': txn.amount,
                 'date': txn.transaction_date.strftime('%Y-%m-%d') if txn.transaction_date else None,
                 'bank_description': txn.bank_description,
@@ -995,15 +1014,15 @@ def get_bank_reconciliation():
                 'student_id': f"STD-{txn.matched_student_id:03d}" if txn.matched_student_id else None,
                 'student_name': None
             }
-            
+
             # Get student name if matched
             if txn.matched_student_id:
                 student = User.query.get(txn.matched_student_id)
                 if student:
                     transaction_data['student_name'] = student.username
-            
+
             transactions_list.append(transaction_data)
-        
+
         summary = {
             'total': total_count,
             'matched': matched_count,
@@ -1011,12 +1030,12 @@ def get_bank_reconciliation():
             'pending': pending_count,
             'total_amount': total_amount
         }
-        
+
         return jsonify({
             'summary': summary,
             'transactions': transactions_list
         }), 200
-    
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -1028,6 +1047,8 @@ def get_bank_reconciliation():
 # ============================================================================
 # ENDPOINT: GET /api/finance/students
 # Description: Returns all students with their payment information (Admin only)
+
+
 # ============================================================================
 @finance_bp.route("/students", methods=["GET"])
 @jwt_required()
@@ -1035,14 +1056,14 @@ def get_bank_reconciliation():
 def get_all_students():
     """
     Returns all students with their payment information for the Student List page.
-    
+
     Query Parameters:
     - search: Search by name or student ID (optional)
     - faculty: Filter by faculty (optional)
     - status: Filter by payment status - Paid/Pending/Unpaid (optional)
     - limit: Number of records to return (default: 50)
     - offset: Pagination offset (default: 0)
-    
+
     Returns:
     {
         "students": [
@@ -1069,10 +1090,10 @@ def get_all_students():
         status_filter = request.args.get('status', type=str)
         limit = request.args.get('limit', default=50, type=int)
         offset = request.args.get('offset', default=0, type=int)
-        
+
         # Base query: Get all non-admin users
-        query = User.query.filter(User.is_admin == False)
-        
+        query = User.query.filter(User.is_admin is False)
+
         # Apply search filter
         if search:
             search_term = f"%{search.lower()}%"
@@ -1091,39 +1112,39 @@ def get_all_students():
                     search_filters.append(User.id == student_id)
                 except ValueError:
                     pass
-            
+
             query = query.filter(db.or_(*search_filters))
-        
+
         # Get total count before pagination
         total_count = query.count()
-        
+
         # Apply pagination
         students = query.offset(offset).limit(limit).all()
-        
+
         # Get all unique faculties from courses for the filter dropdown
         all_faculties = db.session.query(Course.faculty).distinct().filter(
             Course.faculty.isnot(None)
         ).all()
         faculties_list = [f[0] for f in all_faculties if f[0]]
-        
+
         # Build student list with payment information
         students_list = []
-        
+
         for student in students:
             # Calculate total fees from enrollments
             enrollments = Enrollment.query.filter_by(student_id=student.id).all()
             total_fees = sum(e.course_fee for e in enrollments) if enrollments else 0.0
-            
+
             # Calculate paid amount from payments
             payments = Payment.query.filter_by(
                 student_id=student.id,
                 status='RECEIVED'
             ).all()
             paid_amount = sum(p.amount for p in payments) if payments else 0.0
-            
+
             # Get dues balance
             dues = float(student.dues_balance) if student.dues_balance else 0.0
-            
+
             # Determine faculty from first enrollment's course
             faculty = "Unknown"
             if enrollments:
@@ -1147,7 +1168,7 @@ def get_all_students():
                             faculty = "Engineering"
                         else:
                             faculty = "Engineering"  # Default
-            
+
             # Determine status
             # Status logic:
             # - "Paid": dues == 0 (fully paid)
@@ -1159,16 +1180,16 @@ def get_all_students():
                 status = "Pending"
             else:
                 status = "Unpaid"
-            
+
             # Apply filters
             if faculty_filter and faculty_filter.lower() not in ['all', 'all faculties']:
                 if faculty != faculty_filter:
                     continue
-            
+
             if status_filter:
                 if status.lower() != status_filter.lower():
                     continue
-            
+
             students_list.append({
                 "id": f"STD-{str(student.id).zfill(3)}",
                 "user_id": student.id,
@@ -1180,13 +1201,13 @@ def get_all_students():
                 "dues": round(dues, 2),
                 "status": status
             })
-        
+
         return jsonify({
             "students": students_list,
             "total_count": total_count,
             "faculties": sorted(faculties_list)  # alyan's modification: Return sorted list of faculties
         }), 200
-    
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -1201,6 +1222,8 @@ def get_all_students():
 # ============================================================================
 # ENDPOINT: GET /api/finance/students/<student_id>
 # Description: Returns detailed information for a specific student (Admin only)
+
+
 # ============================================================================
 @finance_bp.route("/students/<int:student_id>", methods=["GET"])
 @jwt_required()
@@ -1209,7 +1232,7 @@ def get_student_details(student_id):
     """
     Returns detailed information for a specific student.
     Used when clicking "View" button in the Student List table.
-    
+
     Returns:
     {
         "student": {
@@ -1234,24 +1257,24 @@ def get_student_details(student_id):
         student = User.query.get(student_id)
         if not student:
             return jsonify({"error": "Student not found"}), 404
-        
+
         if student.is_admin:
             return jsonify({"error": "Cannot view admin user details"}), 400
-        
+
         # Calculate total fees from enrollments
         enrollments = Enrollment.query.filter_by(student_id=student.id).all()
         total_fees = sum(e.course_fee for e in enrollments) if enrollments else 0.0
-        
+
         # Calculate paid amount from payments
         payments = Payment.query.filter_by(
             student_id=student.id,
             status='RECEIVED'
         ).all()
         paid_amount = sum(p.amount for p in payments) if payments else 0.0
-        
+
         # Get dues balance
         dues = float(student.dues_balance) if student.dues_balance else 0.0
-        
+
         # Determine faculty from enrollments
         faculty = "Unknown"
         if enrollments:
@@ -1275,7 +1298,7 @@ def get_student_details(student_id):
                         faculty = "Engineering"
                     else:
                         faculty = "Engineering"  # Default
-        
+
         # Determine status
         if dues == 0:
             status = "Paid"
@@ -1283,7 +1306,7 @@ def get_student_details(student_id):
             status = "Pending"
         else:
             status = "Unpaid"
-        
+
         # Build enrollments list
         enrollments_list = []
         for enrollment in enrollments:
@@ -1305,12 +1328,12 @@ def get_student_details(student_id):
                     "enrollment_date": enrollment.enrollment_date.isoformat() if enrollment.enrollment_date else None,
                     "status": enrollment.status
                 })
-        
+
         # Build payments list
         all_payments = Payment.query.filter_by(student_id=student.id).order_by(
             Payment.payment_date.desc()
         ).all()
-        
+
         payments_list = []
         for payment in all_payments:
             payments_list.append({
@@ -1321,13 +1344,13 @@ def get_student_details(student_id):
                 "status": payment.status,
                 "reference_number": payment.reference_number
             })
-        
+
         # Build notifications list
         notifications_list = []
         notifications = Notification.query.filter_by(student_id=student.id).order_by(
             Notification.created_at.desc()
         ).limit(10).all()  # Get last 10 notifications
-        
+
         for notification in notifications:
             notifications_list.append({
                 "id": notification.id,
@@ -1336,7 +1359,7 @@ def get_student_details(student_id):
                 "date": notification.created_at.isoformat() if notification.created_at else None,
                 "read": notification.is_read
             })
-        
+
         # Build student data
         student_data = {
             "id": f"STD-{str(student.id).zfill(3)}",
@@ -1350,14 +1373,14 @@ def get_student_details(student_id):
             "status": status,
             "created_at": student.created_at.isoformat() if student.created_at else None
         }
-        
+
         return jsonify({
             "student": student_data,
             "enrollments": enrollments_list,
             "payments": payments_list,
             "notifications": notifications_list
         }), 200
-    
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -1371,11 +1394,15 @@ def get_student_details(student_id):
 
 # ============================================================================
 # FEE CALCULATION PAGE ENDPOINTS (alyan's modification)
+
+
 # ============================================================================
 
 # ============================================================================
 # ENDPOINT: GET /api/finance/fee-structure
 # Description: Returns all fee categories with their items (Admin only)
+
+
 # ============================================================================
 @finance_bp.route("/fee-structure", methods=["GET"])
 @jwt_required()
@@ -1390,7 +1417,7 @@ def get_fee_structure():
         fee_structures = FeeStructure.query.filter_by(is_active=True).order_by(
             FeeStructure.category, FeeStructure.display_order
         ).all()
-        
+
         # Group by category
         categories_dict = {}
         category_display_names = {
@@ -1398,7 +1425,7 @@ def get_fee_structure():
             'bus': 'Bus Fees',
             'other': 'Other Fees'
         }
-        
+
         for fee in fee_structures:
             if fee.category not in categories_dict:
                 categories_dict[fee.category] = {
@@ -1407,28 +1434,28 @@ def get_fee_structure():
                     'display_name': category_display_names.get(fee.category, fee.category.title() + ' Fees'),
                     'fees': []
                 }
-            
+
             categories_dict[fee.category]['fees'].append({
                 'id': fee.id,
                 'name': fee.name,
                 'amount': fee.amount,
                 'is_per_credit': fee.is_per_credit
             })
-        
+
         # Convert to list
         categories_list = list(categories_dict.values())
-        
+
         # Get unique faculties from Course model
         faculties = db.session.query(Course.faculty).filter(
             Course.faculty.isnot(None)
         ).distinct().all()
         faculties_list = [f[0] for f in faculties if f[0]]
-        
+
         return jsonify({
             'categories': categories_list,
             'faculties': sorted(faculties_list) if faculties_list else []
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -1442,6 +1469,8 @@ def get_fee_structure():
 # ============================================================================
 # ENDPOINT: PUT /api/finance/fee-structure
 # Description: Save/update all fee structure changes (Admin only)
+
+
 # ============================================================================
 @finance_bp.route("/fee-structure", methods=["PUT"])
 @jwt_required()
@@ -1454,22 +1483,22 @@ def update_fee_structure():
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
-        
+
         updated_count = 0
-        
+
         # Process each category
         for category_name, fee_items in data.items():
             if not isinstance(fee_items, list):
                 continue
-                
+
             for item in fee_items:
                 if 'id' not in item:
                     continue
-                
+
                 fee_item = FeeStructure.query.get(item['id'])
                 if not fee_item:
                     continue
-                
+
                 # Update fields
                 if 'name' in item:
                     fee_item.name = item['name']
@@ -1477,17 +1506,17 @@ def update_fee_structure():
                     fee_item.amount = float(item['amount'])
                 if 'is_per_credit' in item:
                     fee_item.is_per_credit = bool(item['is_per_credit'])
-                
+
                 fee_item.updated_at = datetime.now(timezone.utc)
                 updated_count += 1
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Fee structure updated successfully",
             "updated_count": updated_count
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         import traceback
@@ -1502,6 +1531,8 @@ def update_fee_structure():
 # ============================================================================
 # ENDPOINT: POST /api/finance/fee-structure/item
 # Description: Add a new fee item to a category (Admin only)
+
+
 # ============================================================================
 @finance_bp.route("/fee-structure/item", methods=["POST"])
 @jwt_required()
@@ -1514,18 +1545,18 @@ def add_fee_item():
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
-        
+
         # Validate required fields
         required_fields = ['category', 'name', 'amount']
         for field in required_fields:
             if field not in data:
                 return jsonify({"error": f"Missing required field: {field}"}), 400
-        
+
         # Get max display_order for this category
         max_order = db.session.query(func.max(FeeStructure.display_order)).filter_by(
             category=data['category']
         ).scalar() or 0
-        
+
         # Create new fee item
         new_fee = FeeStructure(
             category=data['category'],
@@ -1535,10 +1566,10 @@ def add_fee_item():
             is_active=True,
             display_order=max_order + 1
         )
-        
+
         db.session.add(new_fee)
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Fee item created successfully",
             "fee": {
@@ -1549,7 +1580,7 @@ def add_fee_item():
                 "is_per_credit": new_fee.is_per_credit
             }
         }), 201
-        
+
     except Exception as e:
         db.session.rollback()
         import traceback
@@ -1564,6 +1595,8 @@ def add_fee_item():
 # ============================================================================
 # ENDPOINT: DELETE /api/finance/fee-structure/item/<item_id>
 # Description: Remove a fee item (Admin only)
+
+
 # ============================================================================
 @finance_bp.route("/fee-structure/item/<int:item_id>", methods=["DELETE"])
 @jwt_required()
@@ -1576,18 +1609,18 @@ def delete_fee_item(item_id):
         fee_item = FeeStructure.query.get(item_id)
         if not fee_item:
             return jsonify({"error": "Fee item not found"}), 404
-        
+
         # Soft delete
         fee_item.is_active = False
         fee_item.updated_at = datetime.now(timezone.utc)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Fee item deleted successfully",
             "id": item_id
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         import traceback
@@ -1602,6 +1635,8 @@ def delete_fee_item(item_id):
 # ============================================================================
 # ENDPOINT: POST /api/finance/calculate-fees
 # Description: Calculate total fees based on parameters (Optional)
+
+
 # ============================================================================
 @finance_bp.route("/calculate-fees", methods=["POST"])
 @jwt_required()
@@ -1615,25 +1650,25 @@ def calculate_fees():
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
-        
+
         credit_hours = int(data.get('credit_hours', 0))
         include_bus = bool(data.get('include_bus', False))
-        
+
         if credit_hours <= 0:
             return jsonify({"error": "Credit hours must be greater than 0"}), 400
-        
+
         # Get all active fee structures
         fee_structures = FeeStructure.query.filter_by(is_active=True).all()
-        
+
         breakdown = {}
         total = 0
         calculation_details = {}
-        
+
         # Process tuition fees
         tuition_fees = [f for f in fee_structures if f.category == 'tuition']
         tuition_total = 0
         per_credit_rate = 0
-        
+
         for fee in tuition_fees:
             if fee.is_per_credit:
                 amount = fee.amount * credit_hours
@@ -1646,15 +1681,16 @@ def calculate_fees():
                 breakdown[fee.name.lower().replace(' ', '_')] = breakdown.get(
                     fee.name.lower().replace(' ', '_'), 0
                 ) + amount
-        
+
         if tuition_total > 0:
             breakdown['tuition'] = breakdown.get('tuition', 0)
             total += tuition_total
             calculation_details['per_credit_rate'] = per_credit_rate
             calculation_details['credit_hours'] = credit_hours
             if per_credit_rate > 0:
-                calculation_details['tuition_formula'] = f"{credit_hours} x ${per_credit_rate} = ${breakdown.get('tuition', 0)}"
-        
+                calculation_details[
+                    'tuition_formula'] = f"{credit_hours} x ${per_credit_rate} = ${breakdown.get('tuition', 0)}"
+
         # Process bus fees if included
         if include_bus:
             bus_fees = [f for f in fee_structures if f.category == 'bus']
@@ -1663,16 +1699,16 @@ def calculate_fees():
                 amount = fee.amount
                 bus_total += amount
                 breakdown['bus'] = breakdown.get('bus', 0) + amount
-            
+
             if bus_total > 0:
                 total += bus_total
-        
+
         return jsonify({
             "breakdown": breakdown,
             "total": total,
             "calculation_details": calculation_details
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -1685,11 +1721,15 @@ def calculate_fees():
 
 # ============================================================================
 # BANK RECONCILIATION PAGE ENDPOINTS (alyan's modification)
+
+
 # ============================================================================
 
 # ============================================================================
 # ENDPOINT: POST /api/finance/bank-reconciliation/sync
 # Description: Sync/import bank transactions from file or external source
+
+
 # ============================================================================
 @finance_bp.route("/bank-reconciliation/sync", methods=["POST"])
 @jwt_required()
@@ -1703,39 +1743,39 @@ def sync_bank_data():
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
-        
+
         source = data.get('source')  # 'file' or 'manual'
         imported_count = 0
         auto_matched = 0
         unmatched = 0
         duplicates_skipped = 0
-        
+
         if source == 'manual':
             transactions_data = data.get('transactions', [])
             if not transactions_data:
                 return jsonify({"error": "No transactions provided"}), 400
-            
+
             for txn_data in transactions_data:
-                bank_ref = txn_data.get('bank_ref')
+                bank_ref = txn_data.get('bank_re')
                 amount = float(txn_data.get('amount', 0))
                 date_str = txn_data.get('date')
                 description = txn_data.get('description', '')
-                
+
                 if not bank_ref or not amount or not date_str:
                     continue
-                
+
                 # Check for duplicates
                 existing = BankTransaction.query.filter_by(bank_ref=bank_ref).first()
                 if existing:
                     duplicates_skipped += 1
                     continue
-                
+
                 # Parse date
                 try:
                     transaction_date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-                except:
+                except Exception:
                     transaction_date = datetime.now(timezone.utc)
-                
+
                 # Create bank transaction
                 bank_txn = BankTransaction(
                     bank_ref=bank_ref,
@@ -1744,16 +1784,15 @@ def sync_bank_data():
                     bank_description=description,
                     status='Unmatched'
                 )
-                
+
                 # Try to auto-match
-                matched = False
                 # Match by amount and date (within 7 days)
                 payment = Payment.query.filter(
                     Payment.amount == amount,
                     Payment.payment_date >= transaction_date - timedelta(days=7),
                     Payment.payment_date <= transaction_date + timedelta(days=7)
                 ).first()
-                
+
                 if payment:
                     bank_txn.matched_payment_id = payment.id
                     bank_txn.matched_student_id = payment.student_id
@@ -1762,22 +1801,21 @@ def sync_bank_data():
                     bank_txn.matched_by = get_jwt_identity()
                     bank_txn.notes = 'Auto-matched by system'
                     auto_matched += 1
-                    matched = True
                 else:
                     unmatched += 1
-                
+
                 db.session.add(bank_txn)
                 imported_count += 1
-        
+
         elif source == 'file':
             # For CSV file upload, would need to parse base64 data
             # For now, return error suggesting manual entry
             return jsonify({
                 "error": "CSV file upload not yet implemented. Please use manual entry."
             }), 501
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Bank data synced successfully",
             "imported_count": imported_count,
@@ -1785,7 +1823,7 @@ def sync_bank_data():
             "unmatched": unmatched,
             "duplicates_skipped": duplicates_skipped
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         import traceback
@@ -1800,6 +1838,8 @@ def sync_bank_data():
 # ============================================================================
 # ENDPOINT: GET /api/finance/bank-reconciliation/<transaction_id>
 # Description: Get detailed information for a specific bank transaction
+
+
 # ============================================================================
 @finance_bp.route("/bank-reconciliation/<int:transaction_id>", methods=["GET"])
 @jwt_required()
@@ -1812,11 +1852,11 @@ def get_bank_transaction_details(transaction_id):
         transaction = BankTransaction.query.get(transaction_id)
         if not transaction:
             return jsonify({"error": "Transaction not found"}), 404
-        
+
         # Build transaction data
         transaction_data = {
             'id': transaction.id,
-            'bank_ref': transaction.bank_ref,
+            'bank_re': transaction.bank_ref,
             'amount': transaction.amount,
             'date': transaction.transaction_date.strftime('%Y-%m-%d') if transaction.transaction_date else None,
             'bank_description': transaction.bank_description,
@@ -1824,12 +1864,12 @@ def get_bank_transaction_details(transaction_id):
             'matched_at': transaction.matched_at.isoformat() if transaction.matched_at else None,
             'notes': transaction.notes
         }
-        
+
         # Get matcher info
         if transaction.matched_by:
             matcher = User.query.get(transaction.matched_by)
             transaction_data['matched_by'] = matcher.username if matcher else None
-        
+
         # Get matched payment info
         matched_payment_data = None
         if transaction.matched_payment_id:
@@ -1847,7 +1887,7 @@ def get_bank_transaction_details(transaction_id):
                     'reference_number': payment.reference_number,
                     'status': payment.status
                 }
-        
+
         # Get student info
         student_data = None
         if transaction.matched_student_id:
@@ -1858,7 +1898,7 @@ def get_bank_transaction_details(transaction_id):
                     Payment.student_id == student.id,
                     Payment.status == 'RECEIVED'
                 ).scalar() or 0
-                
+
                 student_data = {
                     'id': student.id,
                     'name': student.username,
@@ -1866,13 +1906,13 @@ def get_bank_transaction_details(transaction_id):
                     'dues_balance': student.dues_balance,
                     'total_paid': total_paid
                 }
-        
+
         return jsonify({
             'transaction': transaction_data,
             'matched_payment': matched_payment_data,
             'student': student_data
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -1886,6 +1926,8 @@ def get_bank_transaction_details(transaction_id):
 # ============================================================================
 # ENDPOINT: PUT /api/finance/bank-reconciliation/<transaction_id>/match
 # Description: Manually match a bank transaction to a student/payment
+
+
 # ============================================================================
 @finance_bp.route("/bank-reconciliation/<int:transaction_id>/match", methods=["PUT"])
 @jwt_required()
@@ -1898,32 +1940,32 @@ def match_bank_transaction(transaction_id):
         transaction = BankTransaction.query.get(transaction_id)
         if not transaction:
             return jsonify({"error": "Transaction not found"}), 404
-        
+
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
-        
+
         current_user_id = get_jwt_identity()
-        
+
         # Option 1: Match to existing payment
         if 'payment_id' in data:
             payment_id = data.get('payment_id')
             payment = Payment.query.get(payment_id)
             if not payment:
                 return jsonify({"error": "Payment not found"}), 404
-            
+
             transaction.matched_payment_id = payment_id
             transaction.matched_student_id = payment.student_id
             transaction.status = 'Matched'
             transaction.matched_at = datetime.now(timezone.utc)
             transaction.matched_by = current_user_id
             transaction.notes = data.get('notes', 'Manually matched to existing payment')
-            
+
             student = User.query.get(payment.student_id)
             student_name = student.username if student else None
-            
+
             db.session.commit()
-            
+
             return jsonify({
                 "msg": "Transaction matched successfully",
                 "transaction_id": transaction_id,
@@ -1933,14 +1975,14 @@ def match_bank_transaction(transaction_id):
                 "student_name": student_name,
                 "remaining_dues": student.dues_balance if student else None
             }), 200
-        
+
         # Option 2: Create new payment and match
         elif data.get('create_payment') and 'student_id' in data:
             student_id = data.get('student_id')
             student = User.query.get(student_id)
             if not student:
                 return jsonify({"error": "Student not found"}), 404
-            
+
             # Create new payment
             new_payment = Payment(
                 student_id=student_id,
@@ -1952,13 +1994,13 @@ def match_bank_transaction(transaction_id):
                 recorded_by=current_user_id,
                 notes=data.get('notes', 'Payment created from bank transaction')
             )
-            
+
             db.session.add(new_payment)
             db.session.flush()  # Get payment ID
-            
+
             # Update student dues
             student.dues_balance = max(0, student.dues_balance - transaction.amount)
-            
+
             # Match transaction
             transaction.matched_payment_id = new_payment.id
             transaction.matched_student_id = student_id
@@ -1966,9 +2008,9 @@ def match_bank_transaction(transaction_id):
             transaction.matched_at = datetime.now(timezone.utc)
             transaction.matched_by = current_user_id
             transaction.notes = data.get('notes', 'New payment created from bank transaction')
-            
+
             db.session.commit()
-            
+
             return jsonify({
                 "msg": "Transaction matched successfully",
                 "transaction_id": transaction_id,
@@ -1978,10 +2020,10 @@ def match_bank_transaction(transaction_id):
                 "student_name": student.username,
                 "remaining_dues": student.dues_balance
             }), 200
-        
+
         else:
-            return jsonify({"error": "Invalid request. Provide either 'payment_id' or 'create_payment' with 'student_id'"}), 400
-        
+            return jsonify({"error": "Invalid request. Provide either 'payment_id' or 'create_payment' with 'student_id'"}), 400  # noqa: E501
+
     except Exception as e:
         db.session.rollback()
         import traceback
@@ -1996,6 +2038,8 @@ def match_bank_transaction(transaction_id):
 # ============================================================================
 # ENDPOINT: GET /api/finance/bank-reconciliation/suggestions/<transaction_id>
 # Description: Get matching suggestions for an unmatched transaction
+
+
 # ============================================================================
 @finance_bp.route("/bank-reconciliation/suggestions/<int:transaction_id>", methods=["GET"])
 @jwt_required()
@@ -2008,15 +2052,15 @@ def get_matching_suggestions(transaction_id):
         transaction = BankTransaction.query.get(transaction_id)
         if not transaction:
             return jsonify({"error": "Transaction not found"}), 404
-        
+
         suggestions = []
-        
+
         # Get students with outstanding dues
         students_with_dues = User.query.filter(
             User.dues_balance > 0,
-            User.is_admin == False
+            User.is_admin is False
         ).all()
-        
+
         unmatched_students = []
         for student in students_with_dues:
             unmatched_students.append({
@@ -2024,7 +2068,7 @@ def get_matching_suggestions(transaction_id):
                 'student_name': student.username,
                 'dues_balance': student.dues_balance
             })
-            
+
             # Check for exact amount match
             if abs(student.dues_balance - transaction.amount) < 0.01:
                 suggestions.append({
@@ -2045,21 +2089,21 @@ def get_matching_suggestions(transaction_id):
                     'student_email': student.email,
                     'dues_balance': student.dues_balance,
                     'match_confidence': 'MEDIUM',
-                    'reason': f'Similar amount (within 10%) - Dues: ${student.dues_balance}, Transaction: ${transaction.amount}'
+                    'reason': f'Similar amount (within 10%) - Dues: ${student.dues_balance}, Transaction: ${transaction.amount}'  # noqa: E501
                 })
-        
+
         # Check for payments with similar amount and date
         if transaction.transaction_date:
             date_range_start = transaction.transaction_date - timedelta(days=7)
             date_range_end = transaction.transaction_date + timedelta(days=7)
-            
+
             similar_payments = Payment.query.filter(
                 Payment.amount == transaction.amount,
                 Payment.payment_date >= date_range_start,
                 Payment.payment_date <= date_range_end,
                 Payment.status == 'RECEIVED'
             ).all()
-            
+
             for payment in similar_payments:
                 student = User.query.get(payment.student_id)
                 if student:
@@ -2072,22 +2116,22 @@ def get_matching_suggestions(transaction_id):
                         'match_confidence': 'HIGH',
                         'reason': 'Exact amount and date match'
                     })
-        
+
         # Sort suggestions by confidence
         confidence_order = {'HIGH': 1, 'MEDIUM': 2, 'LOW': 3}
         suggestions.sort(key=lambda x: confidence_order.get(x.get('match_confidence', 'LOW'), 3))
-        
+
         return jsonify({
             'transaction': {
                 'id': transaction.id,
-                'bank_ref': transaction.bank_ref,
+                'bank_re': transaction.bank_ref,
                 'amount': transaction.amount,
                 'date': transaction.transaction_date.strftime('%Y-%m-%d') if transaction.transaction_date else None
             },
             'suggestions': suggestions[:10],  # Limit to top 10
             'unmatched_students': unmatched_students
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2100,6 +2144,8 @@ def get_matching_suggestions(transaction_id):
 
 # ============================================================================
 # REPORTS PAGE ENDPOINTS (alyan's modification)
+
+
 # ============================================================================
 
 @finance_bp.route("/reports/types", methods=["GET"])
@@ -2108,7 +2154,7 @@ def get_matching_suggestions(transaction_id):
 def get_report_types():
     """
     Returns available report types and configuration options (alyan's modification).
-    
+
     Returns:
     {
         "report_types": [...],
@@ -2119,43 +2165,43 @@ def get_report_types():
         # Get unique faculties from courses
         faculties = db.session.query(Course.faculty).distinct().filter(Course.faculty.isnot(None)).all()
         faculty_list = ["All Faculties"] + [f[0] for f in faculties if f[0]]
-        
+
         report_types = [
             {
                 "id": "student_level",
                 "name": "Student Level Report",
                 "description": "Individual student payment history and outstanding balances",
                 "icon": "user",
-                "available_formats": ["pdf", "excel", "json"]
+                "available_formats": ["pd", "excel", "json"]
             },
             {
                 "id": "faculty_level",
                 "name": "Faculty Level Report",
                 "description": "Aggregated payment data by faculty/department",
                 "icon": "building",
-                "available_formats": ["pdf", "excel", "json"]
+                "available_formats": ["pd", "excel", "json"]
             },
             {
                 "id": "university_level",
                 "name": "University Level Report",
                 "description": "Complete university-wide financial overview",
                 "icon": "chart",
-                "available_formats": ["pdf", "excel", "json"]
+                "available_formats": ["pd", "excel", "json"]
             },
             {
                 "id": "finance_overview",
                 "name": "Finance Overview",
                 "description": "Summary of all financial transactions and metrics",
                 "icon": "document",
-                "available_formats": ["pdf", "excel", "json"]
+                "available_formats": ["pd", "excel", "json"]
             }
         ]
-        
+
         return jsonify({
             "report_types": report_types,
             "faculties": faculty_list
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2172,7 +2218,7 @@ def get_report_types():
 def generate_report():
     """
     Generates a custom report based on parameters (alyan's modification).
-    
+
     Request Body:
     {
         "report_type": "student_level",
@@ -2191,9 +2237,9 @@ def generate_report():
         end_date = data.get('end_date')
         format_type = data.get('format', 'json')
         save_to_history = data.get('save_to_history', False)
-        
+
         current_user_id = get_jwt_identity()
-        
+
         # Generate report ID (check for existing IDs to avoid conflicts)
         year = datetime.now(timezone.utc).year
         # Get the highest existing report number for this year
@@ -2206,22 +2252,22 @@ def generate_report():
                 # Extract number from ID like "RPT-2025-001"
                 num = int(rpt.id.split('-')[-1])
                 existing_numbers.append(num)
-            except:
+            except Exception:
                 pass
         report_count = (max(existing_numbers) + 1) if existing_numbers else 1
         report_id = f"RPT-{year}-{report_count:03d}"
-        
+
         # Debug: Print report ID being generated
         print(f"DEBUG: Generating report with ID: {report_id}")
-        
+
         # Generate report name
         faculty_display = faculty if faculty != 'All Faculties' else 'All'
         report_name = f"{report_type.replace('_', ' ').title()} - {faculty_display} - {year}"
-        
+
         # Generate report data based on type
         report_data = None
         summary = {}
-        
+
         if report_type == 'student_level':
             report_data, summary = _generate_student_level_report(faculty, start_date, end_date)
         elif report_type == 'faculty_level':
@@ -2232,7 +2278,7 @@ def generate_report():
             report_data, summary = _generate_finance_overview_report(start_date, end_date)
         else:
             return jsonify({"error": f"Unknown report type: {report_type}"}), 400
-        
+
         # If format is JSON, return data directly
         if format_type == 'json':
             response = {
@@ -2247,7 +2293,7 @@ def generate_report():
                 "summary": summary,
                 "data": report_data
             }
-            
+
             # Save to history if requested (always save JSON reports so they can be downloaded later)
             if save_to_history or True:  # Always save JSON reports
                 report_record = GeneratedReport(
@@ -2268,9 +2314,9 @@ def generate_report():
                 )
                 db.session.add(report_record)
                 db.session.commit()
-            
+
             return jsonify(response), 200
-        
+
         # For PDF/Excel, save to history and return download URL
         # Note: PDF/Excel generation would require additional libraries (reportlab, openpyxl)
         # For now, we'll save the JSON data and return a placeholder
@@ -2294,20 +2340,20 @@ def generate_report():
             )
             db.session.add(report_record)
             db.session.commit()
-            
+
             # Debug: Verify report was saved
             saved_report = GeneratedReport.query.get(report_id)
             if saved_report:
                 print(f"DEBUG: Report {report_id} saved successfully")
             else:
                 print(f"DEBUG: ERROR - Report {report_id} was not saved!")
-        
+
         return jsonify({
             "report_id": report_id,
             "download_url": f"/api/finance/reports/download/{report_id}?format={format_type}",
             "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2324,16 +2370,16 @@ def generate_report():
 def download_report(report_id):
     """
     Downloads a generated report in specified format (alyan's modification).
-    
+
     Query Parameters:
-    - format: 'pdf', 'excel', or 'json' (default: 'json')
+    - format: 'pd', 'excel', or 'json' (default: 'json')
     """
     try:
         format_type = request.args.get('format', 'json')
-        
+
         # Debug: Print report_id being searched
         print(f"DEBUG: Looking for report with ID: {report_id}")
-        
+
         report = GeneratedReport.query.get(report_id)
         if not report:
             # Debug: Check what reports exist
@@ -2342,27 +2388,27 @@ def download_report(report_id):
             if all_reports:
                 print(f"DEBUG: Existing report IDs: {[r.id for r in all_reports]}")
             return jsonify({"error": f"Report not found: {report_id}"}), 404
-        
+
         # Check if report has expired
         if report.expires_at and report.expires_at < datetime.now(timezone.utc):
             return jsonify({"error": "Report has expired"}), 410
-        
+
         # Get report data from parameters (stored when generated)
         # Handle JSON column - it might be a dict or already parsed
         params = report.parameters if isinstance(report.parameters, dict) else {}
         if isinstance(report.parameters, str):
             try:
                 params = json.loads(report.parameters)
-            except:
+            except Exception:
                 params = {}
-        
+
         report_data = params.get('report_data') if params else None
         summary = params.get('summary') if params else {}
-        
+
         # Debug: Check if data exists
         print(f"DEBUG: Report found. Has report_data: {report_data is not None}, Has summary: {bool(summary)}")
         print(f"DEBUG: Report parameters type: {type(report.parameters)}")
-        
+
         # Helper function to serialize complex objects
         def json_serializer(obj):
             """JSON serializer for objects not serializable by default json code"""
@@ -2373,16 +2419,16 @@ def download_report(report_id):
             elif hasattr(obj, '__dict__'):
                 try:
                     return obj.__dict__
-                except:
+                except Exception:
                     return str(obj)
             elif hasattr(obj, 'to_dict'):
                 try:
                     return obj.to_dict()
-                except:
+                except Exception:
                     return str(obj)
             else:
                 return str(obj)
-        
+
         # Build full report response
         try:
             # Ensure report_data and summary are JSON-serializable
@@ -2390,7 +2436,7 @@ def download_report(report_id):
                 report_data = []
             if not isinstance(summary, dict):
                 summary = {}
-            
+
             full_report = {
                 "report_id": report.id,
                 "report_name": report.name,
@@ -2404,7 +2450,7 @@ def download_report(report_id):
                 "summary": summary,
                 "data": report_data
             }
-            
+
             # Serialize to JSON with proper handling of complex objects
             try:
                 json_str = json.dumps(full_report, indent=2, default=json_serializer, ensure_ascii=False)
@@ -2414,24 +2460,24 @@ def download_report(report_id):
                 print(traceback.format_exc())
                 # Fallback: convert everything to string
                 json_str = json.dumps(full_report, indent=2, default=str, ensure_ascii=False)
-            
+
             if format_type == 'json':
                 # Return JSON file
                 return Response(
                     json_str,
                     mimetype='application/json',
                     headers={
-                        'Content-Disposition': f'attachment; filename="{report.id}.json"'
+                        'Content-Disposition': 'attachment; filename="{report.id}.json"'
                     }
                 )
-            elif format_type == 'pdf':
+            elif format_type == 'pd':
                 # Placeholder: In production, generate PDF using reportlab
                 # For now, return JSON with PDF mimetype
                 return Response(
                     json_str,
                     mimetype='application/pdf',
                     headers={
-                        'Content-Disposition': f'attachment; filename="{report.id}.pdf"'
+                        'Content-Disposition': 'attachment; filename="{report.id}.pd"'
                     }
                 )
             elif format_type == 'excel':
@@ -2441,7 +2487,7 @@ def download_report(report_id):
                     json_str,
                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={
-                        'Content-Disposition': f'attachment; filename="{report.id}.xlsx"'
+                        'Content-Disposition': 'attachment; filename="{report.id}.xlsx"'
                     }
                 )
             else:
@@ -2451,7 +2497,7 @@ def download_report(report_id):
             import traceback
             print(traceback.format_exc())
             return jsonify({"error": f"Failed to build report response: {str(build_error)}"}), 500
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2468,7 +2514,7 @@ def download_report(report_id):
 def get_report_history():
     """
     Returns list of recently generated reports (alyan's modification).
-    
+
     Query Parameters:
     - limit: Number of records (default: 10)
     - offset: Pagination offset (default: 0)
@@ -2478,23 +2524,23 @@ def get_report_history():
         limit = request.args.get('limit', default=10, type=int)
         offset = request.args.get('offset', default=0, type=int)
         report_type_filter = request.args.get('report_type', type=str)
-        
+
         query = GeneratedReport.query
-        
+
         if report_type_filter:
             query = query.filter(GeneratedReport.report_type == report_type_filter)
-        
+
         total_count = query.count()
         reports = query.order_by(desc(GeneratedReport.generated_at)).offset(offset).limit(limit).all()
-        
+
         reports_list = [report.to_dict() for report in reports]
-        
+
         return jsonify({
             "reports": reports_list,
             "total_count": total_count,
             "has_more": (offset + limit) < total_count
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2511,7 +2557,7 @@ def get_report_history():
 def get_faculty_summary():
     """
     Returns faculty-level aggregated data for Faculty Level Report (alyan's modification).
-    
+
     Query Parameters:
     - start_date: Filter start date (optional)
     - end_date: Filter end date (optional)
@@ -2519,59 +2565,59 @@ def get_faculty_summary():
     try:
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
-        
+
         start_date = None
         end_date = None
         if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
         if end_date_str:
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-        
+
         # Get all faculties
         faculties = db.session.query(Course.faculty).distinct().filter(Course.faculty.isnot(None)).all()
         faculty_list = [f[0] for f in faculties if f[0]]
-        
+
         faculties_data = []
         total_students = 0
         total_fees = 0
         total_collected = 0
         total_pending = 0
-        
+
         for faculty_name in faculty_list:
             # Get enrollments for this faculty
             enrollments = db.session.query(Enrollment).join(Course).filter(
                 Course.faculty == faculty_name
             )
-            
+
             if start_date:
                 enrollments = enrollments.filter(Enrollment.enrollment_date >= start_date)
             if end_date:
                 enrollments = enrollments.filter(Enrollment.enrollment_date <= end_date)
-            
+
             enrollments_list = enrollments.all()
-            
+
             # Calculate totals
             faculty_students = len(set(e.student_id for e in enrollments_list))
             faculty_total_fees = sum(e.course_fee for e in enrollments_list)
-            
+
             # Get payments for students in this faculty
             student_ids = [e.student_id for e in enrollments_list]
             payments_query = db.session.query(Payment).filter(Payment.student_id.in_(student_ids))
-            
+
             if start_date:
                 payments_query = payments_query.filter(Payment.payment_date >= start_date)
             if end_date:
                 payments_query = payments_query.filter(Payment.payment_date <= end_date)
-            
+
             payments = payments_query.filter(Payment.status == 'RECEIVED').all()
             faculty_collected = sum(p.amount for p in payments)
             faculty_pending = faculty_total_fees - faculty_collected
-            
+
             # Calculate student status counts
             paid_students = 0
             pending_students = 0
             unpaid_students = 0
-            
+
             for student_id in set(student_ids):
                 student = User.query.get(student_id)
                 if student:
@@ -2581,9 +2627,9 @@ def get_faculty_summary():
                         pending_students += 1
                     else:
                         unpaid_students += 1
-            
+
             collection_rate = (faculty_collected / faculty_total_fees * 100) if faculty_total_fees > 0 else 0
-            
+
             faculties_data.append({
                 "name": faculty_name,
                 "total_students": faculty_students,
@@ -2595,14 +2641,14 @@ def get_faculty_summary():
                 "pending_students": pending_students,
                 "unpaid_students": unpaid_students
             })
-            
+
             total_students += faculty_students
             total_fees += faculty_total_fees
             total_collected += faculty_collected
             total_pending += faculty_pending
-        
+
         overall_collection_rate = (total_collected / total_fees * 100) if total_fees > 0 else 0
-        
+
         return jsonify({
             "report_date": datetime.now(timezone.utc).isoformat(),
             "date_range": {
@@ -2618,7 +2664,7 @@ def get_faculty_summary():
                 "overall_collection_rate": round(overall_collection_rate, 2)
             }
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2635,7 +2681,7 @@ def get_faculty_summary():
 def get_university_summary():
     """
     Returns university-wide overview data for University Level Report (alyan's modification).
-    
+
     Query Parameters:
     - start_date: Filter start date (optional)
     - end_date: Filter end date (optional)
@@ -2643,46 +2689,46 @@ def get_university_summary():
     try:
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
-        
+
         start_date = None
         end_date = None
         if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
         if end_date_str:
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-        
+
         # Get all students (non-admin)
-        students_query = User.query.filter(User.is_admin == False)
+        students_query = User.query.filter(User.is_admin is False)
         total_students = students_query.count()
-        
+
         # Get all enrollments
         enrollments_query = Enrollment.query
         if start_date:
             enrollments_query = enrollments_query.filter(Enrollment.enrollment_date >= start_date)
         if end_date:
             enrollments_query = enrollments_query.filter(Enrollment.enrollment_date <= end_date)
-        
+
         enrollments = enrollments_query.all()
         total_enrolled_courses = len(enrollments)
         total_fees_expected = sum(e.course_fee for e in enrollments)
-        
+
         # Get all payments
         payments_query = Payment.query.filter(Payment.status == 'RECEIVED')
         if start_date:
             payments_query = payments_query.filter(Payment.payment_date >= start_date)
         if end_date:
             payments_query = payments_query.filter(Payment.payment_date <= end_date)
-        
+
         payments = payments_query.all()
         total_collected = sum(p.amount for p in payments)
         total_pending = total_fees_expected - total_collected
         collection_rate = (total_collected / total_fees_expected * 100) if total_fees_expected > 0 else 0
-        
+
         # Calculate by status
-        paid_count = User.query.filter(User.is_admin == False, User.dues_balance == 0).count()
-        pending_count = User.query.filter(User.is_admin == False, User.dues_balance > 0).count()
+        paid_count = User.query.filter(User.is_admin is False, User.dues_balance == 0).count()
+        pending_count = User.query.filter(User.is_admin is False, User.dues_balance > 0).count()
         unpaid_count = total_students - paid_count - pending_count
-        
+
         # Monthly trends (last 6 months)
         monthly_trends = []
         for i in range(6):
@@ -2693,26 +2739,26 @@ def get_university_summary():
             else:
                 next_month = month_start + timedelta(days=32)
                 month_end = next_month.replace(day=1) - timedelta(seconds=1)
-            
+
             month_payments = Payment.query.filter(
                 Payment.status == 'RECEIVED',
                 Payment.payment_date >= month_start,
                 Payment.payment_date <= month_end
             ).all()
-            
+
             month_collected = sum(p.amount for p in month_payments)
             month_target = total_fees_expected / 12  # Rough estimate
             month_rate = (month_collected / month_target * 100) if month_target > 0 else 0
-            
+
             monthly_trends.append({
                 "month": month_start.strftime('%b %Y'),
                 "collected": month_collected,
                 "target": month_target,
                 "rate": round(month_rate, 1)
             })
-        
+
         monthly_trends.reverse()
-        
+
         # By payment method
         payment_methods = {}
         for payment in payments:
@@ -2721,7 +2767,7 @@ def get_university_summary():
                 payment_methods[method] = {"amount": 0, "count": 0}
             payment_methods[method]["amount"] += payment.amount
             payment_methods[method]["count"] += 1
-        
+
         by_payment_method = []
         for method, data in payment_methods.items():
             percentage = (data["amount"] / total_collected * 100) if total_collected > 0 else 0
@@ -2731,7 +2777,7 @@ def get_university_summary():
                 "count": data["count"],
                 "percentage": round(percentage, 2)
             })
-        
+
         # By faculty
         faculties = db.session.query(Course.faculty).distinct().filter(Course.faculty.isnot(None)).all()
         by_faculty = []
@@ -2752,7 +2798,7 @@ def get_university_summary():
                 "collected": faculty_collected,
                 "percentage": round(percentage, 2)
             })
-        
+
         return jsonify({
             "report_date": datetime.now(timezone.utc).isoformat(),
             "period": f"Academic Year {datetime.now(timezone.utc).year}-{datetime.now(timezone.utc).year + 1}",
@@ -2765,15 +2811,15 @@ def get_university_summary():
                 "collection_rate": round(collection_rate, 2)
             },
             "by_status": {
-                "paid": {"count": paid_count, "percentage": round((paid_count / total_students * 100) if total_students > 0 else 0, 1)},
-                "pending": {"count": pending_count, "percentage": round((pending_count / total_students * 100) if total_students > 0 else 0, 1)},
-                "unpaid": {"count": unpaid_count, "percentage": round((unpaid_count / total_students * 100) if total_students > 0 else 0, 1)}
+                "paid": {"count": paid_count, "percentage": round((paid_count / total_students * 100) if total_students > 0 else 0, 1)},  # noqa: E501
+                "pending": {"count": pending_count, "percentage": round((pending_count / total_students * 100) if total_students > 0 else 0, 1)},  # noqa: E501
+                "unpaid": {"count": unpaid_count, "percentage": round((unpaid_count / total_students * 100) if total_students > 0 else 0, 1)}  # noqa: E501
             },
             "monthly_trends": monthly_trends,
             "by_payment_method": by_payment_method,
             "by_faculty": by_faculty
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2795,15 +2841,15 @@ def delete_report(report_id):
         report = GeneratedReport.query.get(report_id)
         if not report:
             return jsonify({"error": "Report not found"}), 404
-        
+
         db.session.delete(report)
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Report deleted successfully",
             "report_id": report_id
         }), 200
-        
+
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -2816,12 +2862,14 @@ def delete_report(report_id):
 
 # ============================================================================
 # HELPER FUNCTIONS FOR REPORT GENERATION (alyan's modification)
+
+
 # ============================================================================
 
 def _generate_student_level_report(faculty, start_date, end_date):
     """Generate student level report data."""
-    query = User.query.filter(User.is_admin == False)
-    
+    query = User.query.filter(User.is_admin is False)
+
     if faculty and faculty != 'All Faculties':
         # Filter by faculty through enrollments
         student_ids = db.session.query(Enrollment.student_id).join(Course).filter(
@@ -2829,9 +2877,9 @@ def _generate_student_level_report(faculty, start_date, end_date):
         ).distinct().all()
         student_ids = [s[0] for s in student_ids]
         query = query.filter(User.id.in_(student_ids))
-    
+
     students = query.all()
-    
+
     data = []
     total_fees = 0
     total_collected = 0
@@ -2839,7 +2887,7 @@ def _generate_student_level_report(faculty, start_date, end_date):
     paid_count = 0
     pending_count = 0
     unpaid_count = 0
-    
+
     for student in students:
         # Get enrollments
         enrollments = Enrollment.query.filter(Enrollment.student_id == student.id)
@@ -2847,10 +2895,10 @@ def _generate_student_level_report(faculty, start_date, end_date):
             enrollments = enrollments.filter(Enrollment.enrollment_date >= start_date)
         if end_date:
             enrollments = enrollments.filter(Enrollment.enrollment_date <= end_date)
-        
+
         enrollments_list = enrollments.all()
         student_total_fees = sum(e.course_fee for e in enrollments_list)
-        
+
         # Get payments
         payments = Payment.query.filter(
             Payment.student_id == student.id,
@@ -2860,26 +2908,26 @@ def _generate_student_level_report(faculty, start_date, end_date):
             payments = payments.filter(Payment.payment_date >= start_date)
         if end_date:
             payments = payments.filter(Payment.payment_date <= end_date)
-        
+
         payments_list = payments.all()
         student_paid = sum(p.amount for p in payments_list)
         student_dues = student.dues_balance
-        
+
         # Get faculty from first enrollment
         faculty_name = None
         if enrollments_list:
             first_enrollment = enrollments_list[0]
             if first_enrollment.course:
                 faculty_name = first_enrollment.course.faculty
-        
+
         # Get last payment date
         last_payment_date = None
         if payments_list:
             last_payment = max(payments_list, key=lambda p: p.payment_date)
             last_payment_date = last_payment.payment_date.strftime('%Y-%m-%d')
-        
+
         status = "Paid" if student_dues == 0 else ("Pending" if student_paid > 0 else "Unpaid")
-        
+
         data.append({
             "student_id": f"STD-{student.id:03d}",
             "name": student.username,
@@ -2891,18 +2939,18 @@ def _generate_student_level_report(faculty, start_date, end_date):
             "status": status,
             "last_payment_date": last_payment_date
         })
-        
+
         total_fees += student_total_fees
         total_collected += student_paid
         total_pending += student_dues
-        
+
         if status == "Paid":
             paid_count += 1
         elif status == "Pending":
             pending_count += 1
         else:
             unpaid_count += 1
-    
+
     summary = {
         "total_students": len(students),
         "total_fees": total_fees,
@@ -2913,7 +2961,7 @@ def _generate_student_level_report(faculty, start_date, end_date):
         "pending_count": pending_count,
         "unpaid_count": unpaid_count
     }
-    
+
     return data, summary
 
 
@@ -2943,22 +2991,22 @@ def _generate_university_level_report(start_date, end_date):
 def _generate_finance_overview_report(start_date, end_date):
     """Generate finance overview report data."""
     # Get summary statistics
-    total_students = User.query.filter(User.is_admin == False).count()
-    
+    total_students = User.query.filter(User.is_admin is False).count()
+
     payments_query = Payment.query.filter(Payment.status == 'RECEIVED')
     if start_date:
         payments_query = payments_query.filter(Payment.payment_date >= start_date)
     if end_date:
         payments_query = payments_query.filter(Payment.payment_date <= end_date)
-    
+
     payments = payments_query.all()
     total_collected = sum(p.amount for p in payments)
-    
+
     unpaid_students = User.query.filter(
-        User.is_admin == False,
+        User.is_admin is False,
         User.dues_balance > 0
     ).count()
-    
+
     return [], {
         "total_students": total_students,
         "total_collected": total_collected,
@@ -2969,11 +3017,15 @@ def _generate_finance_overview_report(start_date, end_date):
 
 # ============================================================================
 # UNPAID STUDENTS PAGE ENDPOINTS (alyan's modification)
+
+
 # ============================================================================
 
 # ============================================================================
 # ENDPOINT: GET /api/finance/unpaid-students (Enhanced)
 # Description: Returns unpaid students with all required fields for the page
+
+
 # ============================================================================
 @finance_bp.route("/unpaid-students", methods=["GET"])
 @jwt_required()
@@ -2981,7 +3033,7 @@ def _generate_finance_overview_report(start_date, end_date):
 def get_unpaid_students():
     """
     Returns unpaid students with all required fields for the page (alyan's modification).
-    
+
     Returns:
     {
         "summary": {
@@ -3011,23 +3063,23 @@ def get_unpaid_students():
     """
     try:
         from datetime import datetime, timedelta, timezone
-        
+
         # Get all students with outstanding dues
         students = User.query.filter(
-            User.is_admin == False,
+            User.is_admin is False,
             User.dues_balance > 0
         ).all()
-        
+
         today = datetime.now(timezone.utc).date()
         students_list = []
         overdue_count = 0
         due_today_count = 0
         due_soon_count = 0
-        
+
         for student in students:
             # Get enrollments to determine faculty and calculate due date
             enrollments = Enrollment.query.filter_by(student_id=student.id).all()
-            
+
             # Determine faculty from first enrollment's course
             faculty = "Unknown"
             if enrollments:
@@ -3050,13 +3102,13 @@ def get_unpaid_students():
                             faculty = "Engineering"
                         else:
                             faculty = "Engineering"  # Default
-            
+
             # Calculate due date (30 days from first enrollment, or use payment_due_date if set)
             # alyan's modification: Use getattr to safely access new fields that may not exist yet
             due_date = None
             days_overdue = 0
             status = "Unpaid"
-            
+
             payment_due_date = getattr(student, 'payment_due_date', None)
             if payment_due_date:
                 if isinstance(payment_due_date, datetime):
@@ -3067,7 +3119,7 @@ def get_unpaid_students():
                     # Try to parse as date string or use as-is
                     try:
                         due_date = datetime.fromisoformat(str(payment_due_date)).date()
-                    except:
+                    except Exception:
                         due_date = None
             elif enrollments:
                 first_enrollment_date = enrollments[0].enrollment_date
@@ -3084,12 +3136,12 @@ def get_unpaid_students():
                                 due_date = (parsed_date + timedelta(days=30)).date()
                             else:
                                 due_date = None
-                        except:
+                        except Exception:
                             due_date = None
-            
+
             if due_date:
                 days_overdue = (today - due_date).days
-                
+
                 if days_overdue > 0:
                     status = "Overdue"
                     overdue_count += 1
@@ -3101,18 +3153,19 @@ def get_unpaid_students():
                     due_soon_count += 1
                 else:
                     status = "Unpaid"
-            
+
             # Get last reminder sent date (from notifications)
             # alyan's modification: Use notification_type instead of type
             last_reminder = Notification.query.filter_by(
                 student_id=student.id,
                 notification_type='PAYMENT_REMINDER'
             ).order_by(Notification.created_at.desc()).first()
-            
+
             last_reminder_sent = None
             if last_reminder and last_reminder.created_at:
-                last_reminder_sent = last_reminder.created_at.date().isoformat() if isinstance(last_reminder.created_at, datetime) else str(last_reminder.created_at)
-            
+                last_reminder_sent = last_reminder.created_at.date().isoformat() if isinstance(
+                    last_reminder.created_at, datetime) else str(last_reminder.created_at)
+
             students_list.append({
                 "id": student.id,
                 "user_id": student.id,
@@ -3127,10 +3180,10 @@ def get_unpaid_students():
                 "is_blocked": getattr(student, 'is_blocked', False),  # alyan's modification: Safely access new field
                 "last_reminder_sent": last_reminder_sent
             })
-        
+
         # Calculate summary
         total_outstanding = sum(float(s.dues_balance) for s in students)
-        
+
         return jsonify({
             "summary": {
                 "unpaid_count": len(students),
@@ -3141,7 +3194,7 @@ def get_unpaid_students():
             },
             "students": students_list
         }), 200
-        
+
     except Exception as e:
         current_app.logger.error(f"Error fetching unpaid students: {str(e)}", exc_info=True)
         return jsonify({"error": "Failed to fetch unpaid students", "details": str(e)}), 500
@@ -3150,6 +3203,8 @@ def get_unpaid_students():
 # ============================================================================
 # ENDPOINT: PUT /api/finance/action/penalty/<student_id>
 # Description: Apply late fee penalty to a student
+
+
 # ============================================================================
 @finance_bp.route("/action/penalty/<int:student_id>", methods=["PUT"])
 @jwt_required()
@@ -3157,14 +3212,14 @@ def get_unpaid_students():
 def apply_penalty(student_id):
     """
     Apply late fee penalty to a student (alyan's modification).
-    
+
     Request Body:
     {
         "penalty_amount": 50,
         "penalty_type": "LATE_FEE",
         "notes": "Late payment penalty - 11 days overdue"
     }
-    
+
     Returns:
     {
         "msg": "Penalty applied successfully",
@@ -3175,28 +3230,27 @@ def apply_penalty(student_id):
     }
     """
     try:
-        from datetime import datetime, timezone
         from flask_jwt_extended import get_jwt_identity
-        
+
         data = request.get_json()
         if not data:
             return jsonify({"error": "Request body is required"}), 400
-        
+
         penalty_amount = data.get('penalty_amount')
         penalty_type = data.get('penalty_type', 'LATE_FEE')
         notes = data.get('notes', '')
-        
+
         if not penalty_amount or penalty_amount <= 0:
             return jsonify({"error": "penalty_amount must be a positive number"}), 400
-        
+
         # Get student
         student = User.query.get(student_id)
         if not student or student.is_admin:
             return jsonify({"error": "Student not found"}), 404
-        
+
         # Get current admin user
         admin_id = get_jwt_identity()
-        
+
         # Create penalty record
         penalty = Penalty(
             student_id=student_id,
@@ -3206,10 +3260,10 @@ def apply_penalty(student_id):
             notes=notes
         )
         db.session.add(penalty)
-        
+
         # Update student's dues balance
         student.dues_balance = float(student.dues_balance) + float(penalty_amount)
-        
+
         # Create notification for student
         notification = Notification(
             student_id=student_id,
@@ -3218,18 +3272,18 @@ def apply_penalty(student_id):
             is_read=False
         )
         db.session.add(notification)
-        
+
         # Log action (alyan's modification: Use correct ActionLog fields)
         action_log = ActionLog(
             student_id=student_id,
             action_type='APPLY_PENALTY',
-            action_description=f"Applied ${penalty_amount} penalty ({penalty_type}) to student {student.username} (ID: {student_id})",
+            action_description=f"Applied ${penalty_amount} penalty ({penalty_type}) to student {student.username} (ID: {student_id})",  # noqa: E501
             performed_by=admin_id
         )
         db.session.add(action_log)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Penalty applied successfully",
             "student_id": student_id,
@@ -3237,7 +3291,7 @@ def apply_penalty(student_id):
             "new_dues_balance": float(student.dues_balance),
             "penalty_id": penalty.id
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error applying penalty: {str(e)}", exc_info=True)
@@ -3247,6 +3301,8 @@ def apply_penalty(student_id):
 # ============================================================================
 # ENDPOINT: PUT /api/finance/action/block/<student_id>
 # Description: Block student registration due to unpaid dues
+
+
 # ============================================================================
 @finance_bp.route("/action/block/<int:student_id>", methods=["PUT"])
 @jwt_required()
@@ -3254,14 +3310,14 @@ def apply_penalty(student_id):
 def block_student(student_id):
     """
     Block student registration due to unpaid dues (alyan's modification).
-    
+
     Request Body:
     {
         "block_type": "REGISTRATION",
         "reason": "Outstanding dues over 7 days",
         "notes": "Blocked due to unpaid fees"
     }
-    
+
     Returns:
     {
         "msg": "Registration blocked successfully",
@@ -3271,30 +3327,29 @@ def block_student(student_id):
     }
     """
     try:
-        from datetime import datetime, timezone
         from flask_jwt_extended import get_jwt_identity
-        
+
         data = request.get_json()
         if not data:
             return jsonify({"error": "Request body is required"}), 400
-        
+
         block_type = data.get('block_type', 'REGISTRATION')
         reason = data.get('reason', 'Outstanding dues')
         notes = data.get('notes', '')
-        
+
         # Get student
         student = User.query.get(student_id)
         if not student or student.is_admin:
             return jsonify({"error": "Student not found"}), 404
-        
+
         # Block student (alyan's modification: Use setattr to safely set fields that may not exist yet)
         setattr(student, 'is_blocked', True)
         setattr(student, 'blocked_at', datetime.now(timezone.utc))
         setattr(student, 'blocked_reason', reason)
-        
+
         # Get current admin user
         admin_id = get_jwt_identity()
-        
+
         # Create notification for student
         notification = Notification(
             student_id=student_id,
@@ -3303,29 +3358,29 @@ def block_student(student_id):
             is_read=False
         )
         db.session.add(notification)
-        
+
         # Log action (alyan's modification: Use correct ActionLog fields)
         action_log = ActionLog(
             student_id=student_id,
             action_type='BLOCK_STUDENT',
-            action_description=f"Blocked registration ({block_type}) for student {student.username} (ID: {student_id}): {reason}. Notes: {notes}",
+            action_description=f"Blocked registration ({block_type}) for student {student.username} (ID: {student_id}): {reason}. Notes: {notes}",  # noqa: E501
             performed_by=admin_id
         )
         db.session.add(action_log)
-        
+
         try:
             db.session.commit()
         except Exception as commit_error:
             db.session.rollback()
             # Check if error is due to missing columns
             error_str = str(commit_error).lower()
-            if 'is_blocked' in error_str or 'blocked_at' in error_str or 'blocked_reason' in error_str or 'no such column' in error_str:
+            if 'is_blocked' in error_str or 'blocked_at' in error_str or 'blocked_reason' in error_str or 'no such column' in error_str:  # noqa: E501
                 return jsonify({
                     "error": "Blocking feature requires database migration",
-                    "details": "Please run: flask db migrate -m 'Add User blocking fields and Penalty model' && flask db upgrade"
+                    "details": "Please run: flask db migrate -m 'Add User blocking fields and Penalty model' && flask db upgrade"  # noqa: E501
                 }), 500
             raise  # Re-raise if it's a different error
-        
+
         blocked_at = getattr(student, 'blocked_at', datetime.now(timezone.utc))
         return jsonify({
             "msg": "Registration blocked successfully",
@@ -3333,7 +3388,7 @@ def block_student(student_id):
             "blocked_at": blocked_at.isoformat() if blocked_at else datetime.now(timezone.utc).isoformat(),
             "block_type": block_type
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error blocking student: {str(e)}", exc_info=True)
@@ -3343,6 +3398,8 @@ def block_student(student_id):
 # ============================================================================
 # ENDPOINT: POST /api/finance/action/bulk-reminder
 # Description: Send reminders to multiple students
+
+
 # ============================================================================
 @finance_bp.route("/action/bulk-reminder", methods=["POST"])
 @jwt_required()
@@ -3350,7 +3407,7 @@ def block_student(student_id):
 def bulk_reminder():
     """
     Send reminders to multiple students (alyan's modification).
-    
+
     Request Body:
     {
         "student_ids": [1, 2, 3, 4, 5],
@@ -3363,7 +3420,7 @@ def bulk_reminder():
         "message_template": "default",
         "contact_method": "EMAIL"
     }
-    
+
     Returns:
     {
         "msg": "Bulk reminders sent successfully",
@@ -3377,22 +3434,21 @@ def bulk_reminder():
     }
     """
     try:
-        from datetime import datetime, timezone
         from flask_jwt_extended import get_jwt_identity
-        
+
         data = request.get_json()
         if not data:
             return jsonify({"error": "Request body is required"}), 400
-        
+
         student_ids_input = data.get('student_ids', [])
         message_template = data.get('message_template', 'default')
         contact_method = data.get('contact_method', 'EMAIL')
-        
+
         # Get list of student IDs
         if student_ids_input == "all":
             # Get all unpaid students
             students = User.query.filter(
-                User.is_admin == False,
+                User.is_admin is False,
                 User.dues_balance > 0
             ).all()
             student_ids = [s.id for s in students]
@@ -3400,20 +3456,20 @@ def bulk_reminder():
             student_ids = student_ids_input
         else:
             return jsonify({"error": "student_ids must be a list or 'all'"}), 400
-        
+
         if not student_ids:
             return jsonify({"error": "No students to send reminders to"}), 400
-        
+
         # Get current admin user
         admin_id = get_jwt_identity()
         if not admin_id:
             return jsonify({"error": "Authentication required"}), 401
-        
+
         sent_count = 0
         failed_count = 0
         notifications_created = 0
         details = []
-        
+
         for student_id in student_ids:
             try:
                 student = User.query.get(student_id)
@@ -3421,15 +3477,15 @@ def bulk_reminder():
                     details.append({"student_id": student_id, "status": "failed", "reason": "Student not found"})
                     failed_count += 1
                     continue
-                
+
                 # Get dues balance safely
                 dues_balance = float(student.dues_balance) if student.dues_balance else 0.0
-                
+
                 # Create notification
-                message = f"Reminder: You have outstanding dues of ${dues_balance:.2f}. Please make a payment to avoid penalties."
+                message = f"Reminder: You have outstanding dues of ${dues_balance:.2f}. Please make a payment to avoid penalties."  # noqa: E501
                 if message_template == "urgent":
-                    message = f"URGENT: You have outstanding dues of ${dues_balance:.2f}. Payment is overdue. Please contact the finance office immediately."
-                
+                    message = f"URGENT: You have outstanding dues of ${dues_balance:.2f}. Payment is overdue. Please contact the finance office immediately."  # noqa: E501
+
                 notification = Notification(
                     student_id=student_id,
                     notification_type='PAYMENT_REMINDER',  # alyan's modification: Use notification_type instead of type
@@ -3438,28 +3494,28 @@ def bulk_reminder():
                 )
                 db.session.add(notification)
                 notifications_created += 1
-                
+
                 # Log action (alyan's modification: Use correct ActionLog fields)
                 try:
                     action_log = ActionLog(
                         student_id=student_id,
                         action_type='BULK_REMINDER',
-                        action_description=f"Sent {contact_method} reminder to student {student.username} (ID: {student_id}). Template: {message_template}",
+                        action_description=f"Sent {contact_method} reminder to student {student.username} (ID: {student_id}). Template: {message_template}",  # noqa: E501
                         performed_by=admin_id
                     )
                     db.session.add(action_log)
                 except Exception as log_error:
                     # If ActionLog fails, continue without logging
                     current_app.logger.warning(f"Failed to log action for student {student_id}: {str(log_error)}")
-                
+
                 details.append({"student_id": student_id, "status": "sent"})
                 sent_count += 1
-                
+
             except Exception as e:
                 current_app.logger.error(f"Error sending reminder to student {student_id}: {str(e)}", exc_info=True)
                 details.append({"student_id": student_id, "status": "failed", "reason": str(e)})
                 failed_count += 1
-        
+
         try:
             db.session.commit()
         except Exception as commit_error:
@@ -3474,7 +3530,7 @@ def bulk_reminder():
                     "notifications_created": notifications_created
                 }
             }), 500
-        
+
         return jsonify({
             "msg": "Bulk reminders sent successfully",
             "sent_count": sent_count,
@@ -3482,7 +3538,7 @@ def bulk_reminder():
             "notifications_created": notifications_created,
             "details": details
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error sending bulk reminders: {str(e)}", exc_info=True)
@@ -3492,6 +3548,8 @@ def bulk_reminder():
 # ============================================================================
 # ENDPOINT: POST /api/finance/action/bulk-penalty
 # Description: Apply penalties to multiple students
+
+
 # ============================================================================
 @finance_bp.route("/action/bulk-penalty", methods=["POST"])
 @jwt_required()
@@ -3499,14 +3557,14 @@ def bulk_reminder():
 def bulk_penalty():
     """
     Apply penalties to multiple students (alyan's modification).
-    
+
     Request Body:
     {
         "student_ids": [2, 3, 5],
         "penalty_amount": 50,
         "penalty_type": "LATE_FEE"
     }
-    
+
     Returns:
     {
         "msg": "Bulk penalties applied successfully",
@@ -3519,56 +3577,55 @@ def bulk_penalty():
     }
     """
     try:
-        from datetime import datetime, timezone
         from flask_jwt_extended import get_jwt_identity
-        
+
         data = request.get_json()
         if not data:
             return jsonify({"error": "Request body is required"}), 400
-        
+
         student_ids = data.get('student_ids', [])
         penalty_amount = data.get('penalty_amount')
         penalty_type = data.get('penalty_type', 'LATE_FEE')
-        
+
         if not student_ids or not isinstance(student_ids, list):
             return jsonify({"error": "student_ids must be a non-empty list"}), 400
-        
+
         if not penalty_amount or penalty_amount <= 0:
             return jsonify({"error": "penalty_amount must be a positive number"}), 400
-        
+
         # Get current admin user
         admin_id = get_jwt_identity()
-        
+
         applied_count = 0
         total_penalties = 0
         details = []
-        
+
         for student_id in student_ids:
             try:
                 student = User.query.get(student_id)
                 if not student or student.is_admin:
                     details.append({"student_id": student_id, "status": "failed", "reason": "Student not found"})
                     continue
-                
+
                 # Only apply to students who are overdue (have dues > 0)
                 if student.dues_balance <= 0:
                     details.append({"student_id": student_id, "status": "skipped", "reason": "No outstanding dues"})
                     continue
-                
+
                 # Create penalty record
                 penalty = Penalty(
                     student_id=student_id,
                     amount=float(penalty_amount),
                     penalty_type=penalty_type,
                     applied_by=admin_id,
-                    notes=f"Bulk penalty application"
+                    notes="Bulk penalty application"
                 )
                 db.session.add(penalty)
-                
+
                 # Update student's dues balance
                 old_dues = float(student.dues_balance)
                 student.dues_balance = old_dues + float(penalty_amount)
-                
+
                 # Create notification for student
                 notification = Notification(
                     student_id=student_id,
@@ -3577,16 +3634,16 @@ def bulk_penalty():
                     is_read=False
                 )
                 db.session.add(notification)
-                
+
                 # Log action (alyan's modification: Use correct ActionLog fields)
                 action_log = ActionLog(
                     student_id=student_id,
                     action_type='BULK_PENALTY',
-                    action_description=f"Applied ${penalty_amount} penalty ({penalty_type}) to student {student.username} (ID: {student_id})",
+                    action_description=f"Applied ${penalty_amount} penalty ({penalty_type}) to student {student.username} (ID: {student_id})",  # noqa: E501
                     performed_by=admin_id
                 )
                 db.session.add(action_log)
-                
+
                 details.append({
                     "student_id": student_id,
                     "penalty_amount": float(penalty_amount),
@@ -3594,20 +3651,20 @@ def bulk_penalty():
                 })
                 applied_count += 1
                 total_penalties += float(penalty_amount)
-                
+
             except Exception as e:
                 current_app.logger.error(f"Error applying penalty to student {student_id}: {str(e)}")
                 details.append({"student_id": student_id, "status": "failed", "reason": str(e)})
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Bulk penalties applied successfully",
             "applied_count": applied_count,
             "total_penalties": total_penalties,
             "details": details
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error applying bulk penalties: {str(e)}", exc_info=True)
@@ -3617,6 +3674,8 @@ def bulk_penalty():
 # ============================================================================
 # ENDPOINT: POST /api/finance/action/bulk-block
 # Description: Block registrations for multiple students
+
+
 # ============================================================================
 @finance_bp.route("/action/bulk-block", methods=["POST"])
 @jwt_required()
@@ -3624,14 +3683,14 @@ def bulk_penalty():
 def bulk_block():
     """
     Block registrations for multiple students (alyan's modification).
-    
+
     Request Body:
     {
         "student_ids": [3, 5],
         "block_type": "REGISTRATION",
         "reason": "Outstanding dues over 7 days"
     }
-    
+
     Returns:
     {
         "msg": "Bulk registrations blocked successfully",
@@ -3643,86 +3702,86 @@ def bulk_block():
     }
     """
     try:
-        from datetime import datetime, timezone
         from flask_jwt_extended import get_jwt_identity
-        
+
         data = request.get_json()
         if not data:
             return jsonify({"error": "Request body is required"}), 400
-        
+
         student_ids = data.get('student_ids', [])
         block_type = data.get('block_type', 'REGISTRATION')
         reason = data.get('reason', 'Outstanding dues over 7 days')
-        
+
         if not student_ids or not isinstance(student_ids, list):
             return jsonify({"error": "student_ids must be a non-empty list"}), 400
-        
+
         # Get current admin user
         admin_id = get_jwt_identity()
-        
+
         blocked_count = 0
         details = []
-        
+
         for student_id in student_ids:
             try:
                 student = User.query.get(student_id)
                 if not student or student.is_admin:
                     details.append({"student_id": student_id, "status": "failed", "reason": "Student not found"})
                     continue
-                
+
                 # Block student (alyan's modification: Use setattr to safely set fields)
                 setattr(student, 'is_blocked', True)
                 setattr(student, 'blocked_at', datetime.now(timezone.utc))
                 setattr(student, 'blocked_reason', reason)
-                
+
                 # Create notification for student
                 notification = Notification(
                     student_id=student_id,
-                    notification_type='REGISTRATION_BLOCKED',  # alyan's modification: Use notification_type instead of type
+                    notification_type='REGISTRATION_BLOCKED',
+                    # alyan's modification: Use notification_type instead of type
                     message=f"Your registration has been blocked due to: {reason}",
                     is_read=False
                 )
                 db.session.add(notification)
-                
+
                 # Log action (alyan's modification: Use correct ActionLog fields)
                 action_log = ActionLog(
                     student_id=student_id,
                     action_type='BULK_BLOCK',
-                    action_description=f"Blocked registration ({block_type}) for student {student.username} (ID: {student_id}): {reason}",
+                    action_description=f"Blocked registration ({block_type}) for student {student.username} (ID: {student_id}): {reason}",  # noqa: E501
                     performed_by=admin_id
                 )
                 db.session.add(action_log)
-                
+
                 blocked_at = getattr(student, 'blocked_at', datetime.now(timezone.utc))
                 details.append({
                     "student_id": student_id,
                     "blocked_at": blocked_at.isoformat() if blocked_at else datetime.now(timezone.utc).isoformat()
                 })
                 blocked_count += 1
-                
+
             except Exception as e:
                 current_app.logger.error(f"Error blocking student {student_id}: {str(e)}")
                 details.append({"student_id": student_id, "status": "failed", "reason": str(e)})
-        
+
         try:
             db.session.commit()
         except Exception as commit_error:
             db.session.rollback()
             # Check if error is due to missing columns
             error_str = str(commit_error).lower()
-            if 'is_blocked' in error_str or 'blocked_at' in error_str or 'blocked_reason' in error_str or 'no such column' in error_str:
+            if 'is_blocked' in error_str or 'blocked_at' in error_str or 'blocked_reason' in error_str or 'no such column' in error_str:  # noqa: E501
                 return jsonify({
                     "error": "Blocking feature requires database migration",
-                    "details": "Please run: flask db migrate -m 'Add User blocking fields and Penalty model' && flask db upgrade"
+                    "details": "Please run: flask db migrate -m 'Add User blocking fields and Penalty model' && flask db upgrade"  # noqa: E501
                 }), 500
             raise  # Re-raise if it's a different error
-        
+
         return jsonify({
             "msg": "Bulk registrations blocked successfully",
             "blocked_count": blocked_count,
             "details": details
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error blocking bulk registrations: {str(e)}", exc_info=True)

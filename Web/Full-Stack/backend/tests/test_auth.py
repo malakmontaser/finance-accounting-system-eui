@@ -1,6 +1,7 @@
 import pytest
 from app import create_app, db
 
+
 @pytest.fixture
 def app():
     test_config = {
@@ -15,9 +16,11 @@ def app():
         yield app
         db.drop_all()
 
+
 @pytest.fixture
 def client(app):
     return app.test_client()
+
 
 def test_register_student(client):
     """Test student registration."""
@@ -32,6 +35,7 @@ def test_register_student(client):
     assert response.status_code == 201
     assert response.get_json()['username'] == "teststudent"
 
+
 def test_login_student(client):
     """Test student login."""
     # First register
@@ -43,7 +47,7 @@ def test_login_student(client):
         "last_name": "Student"
     }
     client.post('/api/auth/register', json=register_data)
-    
+
     # Then login
     login_data = {
         "username": "loginstudent",

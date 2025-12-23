@@ -6,13 +6,13 @@ with app.app_context():
     # Delete all payments
     payments = Payment.query.all()
     print(f'Found {len(payments)} payments')
-    
+
     for payment in payments:
         db.session.delete(payment)
-    
+
     db.session.commit()
     print('All payments deleted')
-    
+
     # Reset student1 dues balance to match enrolled courses
     student = User.query.filter_by(username='student1').first()
     if student:

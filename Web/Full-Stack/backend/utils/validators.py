@@ -1,3 +1,4 @@
+
 def validate_required(data, fields):
     missing = []
     for f in fields:

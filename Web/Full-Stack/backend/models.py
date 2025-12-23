@@ -7,6 +7,8 @@ db = SQLAlchemy()
 # ============================================================================
 # FACULTY MODEL - Represents different faculties in the university
 # ============================================================================
+
+
 class Faculty(db.Model):
     __tablename__ = "faculties"
     id = db.Column(db.Integer, primary_key=True)
@@ -14,8 +16,8 @@ class Faculty(db.Model):
     code = db.Column(db.String(10), unique=True, nullable=False)   # e.g., 'CIS', 'DAD', 'BI', 'ENG'
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), 
-                         onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     students = db.relationship('User', back_populates='faculty', foreign_keys='User.faculty_id')
@@ -31,6 +33,7 @@ class Faculty(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
+
 # ============================================================================
 # USER MODEL - Represents both students and admin users
 # ============================================================================
@@ -45,13 +48,13 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False)  # True for Finance/Admin users
     faculty_id = db.Column(db.Integer, db.ForeignKey('faculties.id'), nullable=True)  # Nullable for admin users
     dues_balance = db.Column(db.Float, default=0.0)  # Total outstanding dues
-    is_blocked = db.Column(db.Boolean, default=False)  # alyan's modification: Block registration due to unpaid dues
-    blocked_at = db.Column(db.DateTime, nullable=True)  # alyan's modification: When student was blocked
-    blocked_reason = db.Column(db.String(255), nullable=True)  # alyan's modification: Reason for blocking
-    payment_due_date = db.Column(db.DateTime, nullable=True)  # alyan's modification: Payment due date (calculated from enrollment)
+    is_blocked = db.Column(db.Boolean, default=False)  # Block registration due to unpaid dues
+    blocked_at = db.Column(db.DateTime, nullable=True)  # When student was blocked
+    blocked_reason = db.Column(db.String(255), nullable=True)  # Reason for blocking
+    payment_due_date = db.Column(db.DateTime, nullable=True)  # Payment due date (calculated from enrollment)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), 
-                         onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     faculty = db.relationship('Faculty', back_populates='students', foreign_keys=[faculty_id])
@@ -64,23 +67,23 @@ class User(db.Model):
     def generate_hash(password):
         """Generate a password hash using PBKDF2-SHA256."""
         return sha256.hash(password)
-    
+
     @staticmethod
     def verify_hash(password, hash_):
         """Verify a password against its hash."""
         return sha256.verify(password, hash_)
-        
+
     def set_password(self, password):
         """Set the user's password."""
         self.password_hash = self.generate_hash(password)
-        
+
     def verify_password(self, password):
         """Verify the user's password."""
         return self.verify_hash(password, self.password_hash)
 
     def to_dict(self, include_faculty=False):
         """Convert user to dictionary representation.
-        
+
         Args:
             include_faculty (bool): Whether to include faculty information
         """
@@ -92,16 +95,16 @@ class User(db.Model):
             'last_name': self.last_name,
             'is_admin': self.is_admin,
             'dues_balance': self.dues_balance,
-            'is_blocked': self.is_blocked,  # alyan's modification
-            'blocked_at': self.blocked_at.isoformat() if self.blocked_at else None,  # alyan's modification
-            'blocked_reason': self.blocked_reason,  # alyan's modification
-            'payment_due_date': self.payment_due_date.isoformat() if self.payment_due_date else None,  # alyan's modification
+            'is_blocked': self.is_blocked,
+            'blocked_at': self.blocked_at.isoformat() if self.blocked_at else None,
+            'blocked_reason': self.blocked_reason,
+            'payment_due_date': self.payment_due_date.isoformat() if self.payment_due_date else None,
             'created_at': self.created_at.isoformat()
         }
-        
+
         if include_faculty and self.faculty:
             result['faculty'] = self.faculty.to_dict()
-        
+
         return result
 
 
@@ -117,10 +120,11 @@ class Course(db.Model):
     total_fee = db.Column(db.Float, nullable=False)  # Total fee for the course
     faculty_id = db.Column(db.Integer, db.ForeignKey('faculties.id'), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    faculty = db.Column(db.String(100), nullable=True)  # alyan's modification: Faculty/Department name (Engineering, Computer Science, Digital Arts, Business Informatics)
+    # Faculty/Department name (Engineering, Computer Science, Digital Arts, Business Informatics)
+    faculty_dept = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), 
-                         onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     faculty = db.relationship('Faculty', back_populates='courses')
@@ -128,7 +132,7 @@ class Course(db.Model):
 
     def to_dict(self, include_faculty=False):
         """Convert course to dictionary representation.
-        
+
         Args:
             include_faculty (bool): Whether to include faculty information
         """
@@ -139,13 +143,13 @@ class Course(db.Model):
             'credits': self.credits,
             'total_fee': self.total_fee,
             'description': self.description,
-            'faculty': self.faculty,  # alyan's modification
+            'faculty': self.faculty_dept,
             'created_at': self.created_at.isoformat()
         }
-        
+
         if include_faculty and self.faculty:
             result['faculty'] = self.faculty.to_dict()
-        
+
         return result
 
 
@@ -160,7 +164,8 @@ class Enrollment(db.Model):
     enrollment_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     status = db.Column(db.String(20), default='ACTIVE')  # ACTIVE, COMPLETED, DROPPED
     course_fee = db.Column(db.Float, nullable=False)  # Fee at time of enrollment (snapshot)
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     student = db.relationship('User', back_populates='enrollments', foreign_keys=[student_id])
@@ -229,7 +234,8 @@ class Notification(db.Model):
     __tablename__ = "notifications"
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    notification_type = db.Column(db.String(100), nullable=False)  # e.g., 'REGISTRATION', 'PAYMENT_RECEIVED', 'CONTACT_REQUEST'
+    # e.g., 'REGISTRATION', 'PAYMENT_RECEIVED', 'CONTACT_REQUEST'
+    notification_type = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -258,7 +264,8 @@ class ActionLog(db.Model):
     __tablename__ = "action_logs"
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    action_type = db.Column(db.String(100), nullable=False)  # e.g., 'CONTACT_REQUEST', 'PAYMENT_RECORDED', 'ENROLLMENT'
+    # e.g., 'CONTACT_REQUEST', 'PAYMENT_RECORDED', 'ENROLLMENT'
+    action_type = db.Column(db.String(100), nullable=False)
     action_description = db.Column(db.Text, nullable=False)
     performed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Admin who performed action
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -280,7 +287,7 @@ class ActionLog(db.Model):
 
 
 # ============================================================================
-# FEE STRUCTURE MODEL - Represents fee categories and items (alyan's modification)
+# FEE STRUCTURE MODEL - Represents fee categories and items
 # ============================================================================
 class FeeStructure(db.Model):
     __tablename__ = "fee_structures"
@@ -292,8 +299,9 @@ class FeeStructure(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     display_order = db.Column(db.Integer, default=0)  # For ordering items
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
+
     def to_dict(self):
         """Convert fee structure to dictionary representation."""
         return {
@@ -310,7 +318,7 @@ class FeeStructure(db.Model):
 
 
 # ============================================================================
-# BANK TRANSACTION MODEL - Represents bank transactions for reconciliation (alyan's modification)
+# BANK TRANSACTION MODEL - Represents bank transactions for reconciliation
 # ============================================================================
 class BankTransaction(db.Model):
     __tablename__ = "bank_transactions"
@@ -326,18 +334,19 @@ class BankTransaction(db.Model):
     matched_at = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
+
     # Relationships
     matched_payment = db.relationship('Payment', foreign_keys=[matched_payment_id])
     matched_student = db.relationship('User', foreign_keys=[matched_student_id])
     matcher = db.relationship('User', foreign_keys=[matched_by])
-    
+
     def to_dict(self):
         """Convert bank transaction to dictionary representation."""
         return {
             'id': self.id,
-            'bank_ref': self.bank_ref,
+            'bank_re': self.bank_ref,
             'amount': self.amount,
             'transaction_date': self.transaction_date.isoformat() if self.transaction_date else None,
             'bank_description': self.bank_description,
@@ -353,13 +362,14 @@ class BankTransaction(db.Model):
 
 
 # ============================================================================
-# GENERATED REPORT MODEL - Stores generated financial reports (alyan's modification)
+# GENERATED REPORT MODEL - Stores generated financial reports
 # ============================================================================
 class GeneratedReport(db.Model):
     __tablename__ = "generated_reports"
     id = db.Column(db.String(20), primary_key=True)  # RPT-2025-001
     name = db.Column(db.String(200), nullable=False)
-    report_type = db.Column(db.String(50), nullable=False)  # student_level, faculty_level, university_level, finance_overview
+    # student_level, faculty_level, university_level, finance_overview
+    report_type = db.Column(db.String(50), nullable=False)
     parameters = db.Column(db.JSON)  # Store filter parameters as JSON
     file_path_pdf = db.Column(db.String(255), nullable=True)
     file_path_excel = db.Column(db.String(255), nullable=True)
@@ -368,10 +378,10 @@ class GeneratedReport(db.Model):
     generated_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     generated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = db.Column(db.DateTime, nullable=True)  # For auto-cleanup
-    
+
     # Relationship
     generator = db.relationship('User', foreign_keys=[generated_by])
-    
+
     def to_dict(self):
         """Convert generated report to dictionary representation."""
         return {
@@ -380,16 +390,16 @@ class GeneratedReport(db.Model):
             'report_type': self.report_type,
             'report_type_display': self.get_report_type_display(),
             'parameters': self.parameters,
-            'file_path_pdf': self.file_path_pdf,
+            'file_path_pd': self.file_path_pdf,
             'file_path_excel': self.file_path_excel,
-            'file_size_pdf': self.format_file_size(self.file_size_pdf) if self.file_size_pdf else None,
+            'file_size_pd': self.format_file_size(self.file_size_pdf) if self.file_size_pdf else None,
             'file_size_excel': self.format_file_size(self.file_size_excel) if self.file_size_excel else None,
             'available_formats': self.get_available_formats(),
             'generated_by': self.generated_by,
             'generated_at': self.generated_at.isoformat() if self.generated_at else None,
             'expires_at': self.expires_at.isoformat() if self.expires_at else None
         }
-    
+
     def get_report_type_display(self):
         """Get human-readable report type name."""
         type_map = {
@@ -399,16 +409,16 @@ class GeneratedReport(db.Model):
             'finance_overview': 'Finance Overview'
         }
         return type_map.get(self.report_type, self.report_type)
-    
+
     def get_available_formats(self):
         """Get list of available file formats."""
         formats = []
         if self.file_path_pdf:
-            formats.append('pdf')
+            formats.append('pd')
         if self.file_path_excel:
             formats.append('excel')
         return formats
-    
+
     @staticmethod
     def format_file_size(size_bytes):
         """Format file size in human-readable format."""
@@ -422,7 +432,7 @@ class GeneratedReport(db.Model):
 
 
 # ============================================================================
-# PENALTY MODEL - Tracks late fees and penalties applied to students (alyan's modification)
+# PENALTY MODEL - Tracks late fees and penalties applied to students
 # ============================================================================
 class Penalty(db.Model):
     __tablename__ = "penalties"
@@ -433,11 +443,11 @@ class Penalty(db.Model):
     applied_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Admin who applied it
     applied_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     notes = db.Column(db.Text, nullable=True)
-    
+
     # Relationships
     student = db.relationship('User', foreign_keys=[student_id])
     applied_by_user = db.relationship('User', foreign_keys=[applied_by])
-    
+
     def to_dict(self):
         """Convert penalty to dictionary representation."""
         return {

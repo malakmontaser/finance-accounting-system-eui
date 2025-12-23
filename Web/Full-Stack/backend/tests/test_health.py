@@ -1,6 +1,7 @@
 import pytest
 from app import create_app, db
 
+
 @pytest.fixture
 def app():
     test_config = {
@@ -15,9 +16,11 @@ def app():
         yield app
         db.drop_all()
 
+
 @pytest.fixture
 def client(app):
     return app.test_client()
+
 
 def test_health_check(client):
     """Test the health check endpoint returns 200 OK."""

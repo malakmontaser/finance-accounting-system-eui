@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from models import db, Course, User
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from functools import wraps
 
 
@@ -17,20 +17,20 @@ def require_admin(fn):
     def wrapper(*args, **kwargs):
         try:
             from models import User
-            
+
             identity = get_jwt_identity()
             if not identity:
                 return jsonify({"error": "Authentication required"}), 401
-                
+
             # Get user from database to check admin status
             user = User.query.get(identity)
             if not user or not user.is_admin:
                 return jsonify({"error": "Admin access required"}), 403
-                
+
             # Add user to kwargs for the route to use if needed
             kwargs['current_user'] = user
             return fn(*args, **kwargs)
-            
+
         except Exception as e:
             return jsonify({"error": f"Authorization failed: {str(e)}"}), 401
     return wrapper
@@ -46,10 +46,10 @@ def list_courses():
     """
     List all available courses, optionally filtered by faculty.
     If the user is authenticated and is a student, only show courses from their faculty.
-    
+
     Query Parameters:
         faculty_id (int, optional): Filter courses by faculty ID
-        
+
     Returns:
     {
         "total_courses": 3,
@@ -73,7 +73,7 @@ def list_courses():
     try:
         faculty_id = request.args.get('faculty_id', type=int)
         query = Course.query
-        
+
         # If faculty_id is provided in query params, filter by it
         if faculty_id:
             query = query.filter_by(faculty_id=faculty_id)
@@ -88,9 +88,9 @@ def list_courses():
             except Exception:
                 # Silently continue if JWT check fails
                 pass
-        
+
         courses = query.all()
-        
+
         # Serialize courses using the model's to_dict method
         serialized_courses = []
         for course in courses:
@@ -107,13 +107,13 @@ def list_courses():
                     'total_fee': float(getattr(course, 'total_fee', 0.0)),
                     'error': f'Failed to serialize course: {str(e)}'
                 })
-        
+
         return jsonify({
             "success": True,
             "total_courses": len(serialized_courses),
             "courses": serialized_courses
         }), 200
-    
+
     except Exception as e:
         return jsonify({
             "error": "Failed to retrieve courses",
@@ -129,7 +129,7 @@ def list_courses():
 def get_course(course_id):
     """
     Get details of a specific course.
-    
+
     Returns:
     {
         "id": 1,
@@ -145,7 +145,7 @@ def get_course(course_id):
         course = Course.query.get(course_id)
         if not course:
             return jsonify({"error": "Course not found"}), 404
-        
+
         return jsonify({
             "id": course.id,
             "course_id": course.course_id,
@@ -155,7 +155,7 @@ def get_course(course_id):
             "description": course.description,
             "created_at": course.created_at.isoformat()
         }), 200
-    
+
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve course: {str(e)}"}), 500
 
@@ -170,7 +170,7 @@ def get_course(course_id):
 def create_course(current_user=None):
     """
     Create a new course. Admin only.
-    
+
     Request Body:
     {
         "course_id": "CS101",
@@ -179,7 +179,7 @@ def create_course(current_user=None):
         "total_fee": 5000.0,
         "description": "Introduction to Computer Science"
     }
-    
+
     Returns:
     {
         "msg": "Course created successfully",
@@ -188,19 +188,19 @@ def create_course(current_user=None):
     }
     """
     data = request.get_json()
-    
+
     # Validate required fields
     required_fields = ["course_id", "name", "credits", "total_fee"]
     for field in required_fields:
         if not data.get(field):
             return jsonify({"error": f"{field} is required"}), 400
-    
+
     course_id = data.get("course_id").strip()
-    
+
     # Check if course_id already exists
     if Course.query.filter_by(course_id=course_id).first():
         return jsonify({"error": "Course ID already exists"}), 409
-    
+
     try:
         course = Course(
             course_id=course_id,
@@ -209,16 +209,16 @@ def create_course(current_user=None):
             total_fee=float(data.get("total_fee")),
             description=data.get("description", "")
         )
-        
+
         db.session.add(course)
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Course created successfully",
             "course_id": course.id,
             "name": course.name
         }), 201
-    
+
     except ValueError as e:
         return jsonify({"error": f"Invalid input: {str(e)}"}), 400
     except Exception as e:
@@ -236,7 +236,7 @@ def create_course(current_user=None):
 def update_course(course_id, current_user=None):
     """
     Update course details. Admin only.
-    
+
     Request Body:
     {
         "name": "Advanced Computer Science",
@@ -244,7 +244,7 @@ def update_course(course_id, current_user=None):
         "total_fee": 6000.0,
         "description": "Advanced topics in CS"
     }
-    
+
     Returns:
     {
         "msg": "Course updated successfully",
@@ -256,9 +256,9 @@ def update_course(course_id, current_user=None):
         course = Course.query.get(course_id)
         if not course:
             return jsonify({"error": "Course not found"}), 404
-        
+
         data = request.get_json()
-        
+
         # Update fields if provided
         if data.get("name"):
             course.name = data.get("name")
@@ -268,15 +268,15 @@ def update_course(course_id, current_user=None):
             course.total_fee = float(data.get("total_fee"))
         if "description" in data:
             course.description = data.get("description", "")
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Course updated successfully",
             "course_id": course.id,
             "name": course.name
         }), 200
-    
+
     except ValueError as e:
         return jsonify({"error": f"Invalid input: {str(e)}"}), 400
     except Exception as e:
@@ -294,7 +294,7 @@ def update_course(course_id, current_user=None):
 def delete_course(course_id, current_user=None):
     """
     Delete a course. Admin only.
-    
+
     Returns:
     {
         "msg": "Course deleted successfully",
@@ -303,16 +303,16 @@ def delete_course(course_id, current_user=None):
     """
     try:
         course = Course.query.get_or_404(course_id)
-        
+
         # Delete the course
         db.session.delete(course)
         db.session.commit()
-        
+
         return jsonify({
             "msg": "Course deleted successfully",
             "course_id": course_id
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Failed to delete course: {str(e)}"}), 500
