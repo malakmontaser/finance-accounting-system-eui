@@ -8,18 +8,58 @@ const DashboardLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+  // Close sidebar on route change
+  React.useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
-    logout();
-    // Use replace to avoid browser history and go directly to home
-    window.location.replace('/');
+    // Clear auth data immediately (synchronous)
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Force immediate navigation to home (bypasses all React routing)
+    window.location.href = '/';
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
   };
 
   return (
-    <div className="dashboard-container">
-      {/* Sidebar */}
+    <div className={`dashboard-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Top Header Bar */}
+      <header className="dashboard-topbar">
+        <button className="menu-toggle-btn" onClick={toggleSidebar} aria-label="Toggle Menu">
+          <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="topbar-brand">
+          <img src={logoIcon} alt="Logo" className="topbar-logo" />
+          <span>Student Portal</span>
+        </div>
+      </header>
+
+      {/* Overlay Backdrop */}
+      <div className="sidebar-overlay" onClick={closeSidebar}></div>
+
+      {/* Off-Canvas Sidebar */}
       <aside className="dashboard-sidebar">
-        {/* Logo Section */}
+        {/* Close Button */}
+        <button className="sidebar-close-btn" onClick={closeSidebar} aria-label="Close Sidebar">
+          <svg className="menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Sidebar Header */}
         <div className="sidebar-header">
           <div className="logo-container">
             <img src={logoIcon} alt="Logo" className="sidebar-logo" />
@@ -87,10 +127,12 @@ const DashboardLayout = ({ children }) => {
             </li>
 
             <li className="nav-item">
-              <svg className="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span>Notifications</span>
+              <div className="nav-link">
+                <svg className="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span>Notifications</span>
+              </div>
             </li>
           </ul>
         </nav>

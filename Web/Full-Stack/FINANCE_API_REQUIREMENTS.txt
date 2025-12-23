@@ -1,0 +1,1550 @@
+================================================================================
+FINANCE PAGES - API REQUIREMENTS
+================================================================================
+
+This document lists the API endpoints that need to be created in the backend
+(finance.py) to connect the Finance pages components to real data.
+
+
+################################################################################
+#                           FINANCE DASHBOARD PAGE                             #
+################################################################################
+
+================================================================================
+1. GET /api/finance/summary ✅ COMPLETED
+================================================================================
+Description: Returns overall financial summary statistics for the dashboard
+
+Dashboard Component: Statistics Cards (Top section)
+  - Total Collected
+  - Pending Payments  
+  - Total Students
+  - Unpaid Students
+
+Returns:
+{
+    "total_collected": 2400000,
+    "total_collected_change": 12.5,
+    "pending_payments": 340000,
+    "pending_payments_change": -8.2,
+    "total_students": 2847,
+    "total_students_change": 5.3,
+    "unpaid_students": 156,
+    "unpaid_students_change": -3.1
+}
+
+Notes:
+- Change percentages can be calculated by comparing current period vs previous period
+- total_collected = sum of all payments with status 'RECEIVED' or 'COMPLETED'
+- pending_payments = sum of all dues_balance from students
+- total_students = count of all non-admin users
+- unpaid_students = count of students where dues_balance > 0
+
+
+================================================================================
+2. GET /api/finance/payments/recent ✅ COMPLETED
+================================================================================
+Description: Returns list of recent payments with student and faculty info
+
+Dashboard Component: Recent Payments Table
+
+Query Parameters:
+- limit: Number of records to return (default: 10)
+- offset: Pagination offset (default: 0)
+
+Returns:
+{
+    "payments": [
+        {
+            "id": "STD-001",
+            "student_id": 1,
+            "student_name": "John Smith",
+            "faculty": "Engineering",
+            "amount": 2916,
+            "date": "Dec 10, 2025",
+            "status": "Paid"
+        },
+        ...
+    ],
+    "total_count": 100
+}
+
+Notes:
+- Should join Payment table with User table to get student info
+- Faculty info may need to come from Course/Enrollment data
+- Status values: Paid, Pending, Failed
+
+
+================================================================================
+3. GET /api/finance/payments/by-faculty ✅ COMPLETED
+================================================================================
+Description: Returns payment collection progress grouped by faculty/department
+
+Dashboard Component: Payments by Faculty (Progress bars section)
+
+Returns:
+{
+    "faculties": [
+        {
+            "name": "Engineering",
+            "collected": 850000,
+            "total": 1000000,
+            "percentage": 85.0,
+            "color": "#10b981"
+        },
+        {
+            "name": "Computer Science",
+            "collected": 620000,
+            "total": 750000,
+            "percentage": 82.67,
+            "color": "#fbbf24"
+        },
+        ...
+    ]
+}
+
+Notes:
+- Need to group courses by faculty/department
+- collected = sum of payments for courses in that faculty
+- total = sum of expected fees for all enrollments in that faculty
+- May need to add a 'faculty' or 'department' field to Course model
+
+
+================================================================================
+4. GET /api/finance/bank-reconciliation ✅ COMPLETED (Placeholder)
+================================================================================
+Description: Returns bank transactions with reconciliation status
+
+Dashboard Component: Bank Reconciliation Card
+
+Query Parameters:
+- limit: Number of records to return (default: 10)
+- status: Filter by status (Matched/Pending/Unmatched) (optional)
+
+Returns:
+{
+    "transactions": [
+        {
+            "id": 1,
+            "amount": 5200,
+            "status": "Matched",
+            "status_color": "#10b981",
+            "date": "Today",
+            "reference_number": "BANK123456",
+            "matched_payment_id": 15
+        },
+        {
+            "id": 2,
+            "amount": 3100,
+            "status": "Pending",
+            "status_color": "#fbbf24",
+            "date": "Yesterday",
+            "reference_number": "BANK123457",
+            "matched_payment_id": null
+        },
+        ...
+    ],
+    "summary": {
+        "total_matched": 10,
+        "total_pending": 3,
+        "total_unmatched": 2
+    }
+}
+
+Notes:
+- May need to create a new BankTransaction model
+- Status values:
+  - Matched (green #10b981): Bank transaction matched with a payment record
+  - Pending (yellow #fbbf24): Awaiting reconciliation
+  - Unmatched (red #ef4444): Cannot find matching payment
+- This feature may require importing bank statements
+
+
+================================================================================
+EXISTING ENDPOINTS (Already in finance.py)
+================================================================================
+
+These endpoints already exist and can be used:
+
+1. GET /api/finance/dues
+   - Can provide: unpaid_students count, pending_payments amount
+   - Used for: Unpaid Students card, Pending Payments card
+
+2. GET /api/finance/unpaid-report
+   - Used for: Generate Report button (detailed unpaid report)
+
+3. GET /api/finance/reports/status
+   - Used for: Generate Report button (Pass/Fail status report)
+
+4. PUT /api/finance/action/contact/<student_id>
+   - Used for: Contact student action (in UnpaidStudents page)
+
+5. POST /api/finance/record-payment
+   - Used for: Recording external/manual payments
+
+
+================================================================================
+DEVELOPMENT PRIORITY
+================================================================================
+
+Priority 1 (High): 
+- /api/finance/summary (needed for main dashboard stats)
+- /api/finance/payments/recent (main table on dashboard)
+
+Priority 2 (Medium):
+- /api/finance/payments/by-faculty (faculty progress section)
+
+Priority 3 (Lower):
+- /api/finance/bank-reconciliation (may need new database model)
+
+
+================================================================================
+DATABASE CONSIDERATIONS
+================================================================================
+
+May need to add/modify models:
+
+1. Add 'faculty' or 'department' field to Course model
+   - For grouping payments by faculty
+
+2. Create BankTransaction model (for bank reconciliation)
+   - Fields: id, amount, transaction_date, reference_number, status, 
+             matched_payment_id, created_at, updated_at
+
+3. Consider adding 'status' field to Payment model if not exists
+   - Values: PENDING, COMPLETED, FAILED, REFUNDED
+
+
+
+################################################################################
+#                           STUDENT LIST PAGE                                  #
+################################################################################
+
+================================================================================
+5. GET /api/finance/students ✅ COMPLETED
+================================================================================
+Description: Returns all students with their payment information (Admin only)
+
+Page Component: Student List Table
+
+Query Parameters:
+- search: Search by name or student ID (optional)
+- faculty: Filter by faculty (optional)
+- status: Filter by payment status - Paid/Pending/Unpaid (optional)
+- limit: Number of records to return (default: 50)
+- offset: Pagination offset (default: 0)
+
+Returns:
+{
+    "students": [
+        {
+            "id": "STD-001",
+            "user_id": 1,
+            "name": "John Smith",
+            "email": "john.s@uni.edu",
+            "faculty": "Engineering",
+            "totalFees": 12500,
+            "paid": 12500,
+            "dues": 0,
+            "status": "Paid"
+        },
+        {
+            "id": "STD-002",
+            "user_id": 2,
+            "name": "Sarah Johnson",
+            "email": "sarah.j@uni.edu",
+            "faculty": "Computer Science",
+            "totalFees": 11800,
+            "paid": 5900,
+            "dues": 5900,
+            "status": "Pending"
+        },
+        {
+            "id": "STD-003",
+            "user_id": 3,
+            "name": "James Wilson",
+            "email": "james.w@uni.edu",
+            "faculty": "Engineering",
+            "totalFees": 12500,
+            "paid": 0,
+            "dues": 12500,
+            "status": "Unpaid"
+        }
+    ],
+    "total_count": 100,
+    "faculties": ["Engineering", "Computer Science", "Digital Arts", "Business"]
+}
+
+Notes:
+- Status logic:
+  - "Paid": dues == 0 (fully paid)
+  - "Pending": dues > 0 AND paid > 0 (partially paid)
+  - "Unpaid": paid == 0 (no payment made)
+- totalFees = sum of course_fee from all enrollments
+- paid = totalFees - dues_balance
+- Should include faculties list for the filter dropdown
+
+
+================================================================================
+6. GET /api/finance/students/<student_id> ✅ COMPLETED
+================================================================================
+Description: Returns detailed information for a specific student (Admin only)
+
+Page Component: View Student Details (View button action)
+
+Returns:
+{
+    "student": {
+        "id": "STD-001",
+        "user_id": 1,
+        "name": "John Smith",
+        "email": "john.s@uni.edu",
+        "faculty": "Engineering",
+        "totalFees": 12500,
+        "paid": 12500,
+        "dues": 0,
+        "status": "Paid",
+        "created_at": "2025-09-01T10:00:00"
+    },
+    "enrollments": [
+        {
+            "id": 1,
+            "course_name": "Introduction to Engineering",
+            "course_fee": 5000,
+            "enrollment_date": "2025-09-01T10:00:00",
+            "status": "ACTIVE"
+        },
+        {
+            "id": 2,
+            "course_name": "Advanced Mathematics",
+            "course_fee": 7500,
+            "enrollment_date": "2025-09-15T10:00:00",
+            "status": "ACTIVE"
+        }
+    ],
+    "payments": [
+        {
+            "id": 1,
+            "amount": 5000,
+            "payment_date": "2025-09-05T14:30:00",
+            "payment_method": "ONLINE",
+            "status": "RECEIVED",
+            "reference_number": "TXN123456"
+        },
+        {
+            "id": 2,
+            "amount": 7500,
+            "payment_date": "2025-09-20T11:00:00",
+            "payment_method": "BANK_TRANSFER",
+            "status": "RECEIVED",
+            "reference_number": "BANK789012"
+        }
+    ],
+    "notifications": [
+        {
+            "id": 1,
+            "type": "PAYMENT_RECEIVED",
+            "message": "Payment of $5000 received",
+            "date": "2025-09-05T14:30:00",
+            "read": true
+        }
+    ]
+}
+
+Notes:
+- Provides complete student financial profile
+- Includes enrollment history, payment history, and notifications
+- Used when clicking "View" button in the Student List table
+
+
+================================================================================
+STUDENT LIST PAGE - EXISTING ENDPOINTS
+================================================================================
+
+These endpoints exist but are for STUDENT use (not admin):
+
+1. GET /api/students/status
+   - Returns student's own status and enrollments
+   - NOT suitable for admin viewing all students
+
+2. GET /api/students/payments  
+   - Returns student's own payment history
+   - NOT suitable for admin viewing all students
+
+
+================================================================================
+STUDENT LIST PAGE - DEVELOPMENT PRIORITY
+================================================================================
+
+Priority 1 (High):
+- /api/finance/students (needed for main student list table)
+
+Priority 2 (Medium):
+- /api/finance/students/<student_id> (for View button functionality)
+
+
+
+################################################################################
+#                           FEE CALCULATION PAGE                               #
+################################################################################
+
+================================================================================
+7. GET /api/finance/fee-structure ✅ COMPLETED
+================================================================================
+Description: Returns all fee categories with their items (Admin only)
+
+Page Component: Tuition Fees Card, Bus Fees Card, Fee Calculator
+
+Returns:
+{
+    "categories": [
+        {
+            "id": 1,
+            "name": "tuition",
+            "display_name": "Tuition Fees",
+            "fees": [
+                { "id": 1, "name": "Per Credit Hour", "amount": 200, "is_per_credit": true },
+                { "id": 2, "name": "Registration Fee", "amount": 150, "is_per_credit": false }
+            ]
+        },
+        {
+            "id": 2,
+            "name": "bus",
+            "display_name": "Bus Fees",
+            "fees": [
+                { "id": 3, "name": "Monthly Bus Pass", "amount": 150, "is_per_credit": false },
+                { "id": 4, "name": "Semester Bus Pass", "amount": 500, "is_per_credit": false }
+            ]
+        }
+    ],
+    "faculties": ["Engineering", "Computer Science", "Digital Arts", "Business"]
+}
+
+Notes:
+- Returns all fee categories (tuition, bus, etc.)
+- Each category contains list of fee items
+- is_per_credit flag indicates if fee is multiplied by credit hours
+- Faculties list for the calculator dropdown
+
+
+================================================================================
+8. PUT /api/finance/fee-structure ✅ COMPLETED
+================================================================================
+Description: Save/update all fee structure changes (Admin only)
+
+Page Component: Save Changes Button
+
+Request Body:
+{
+    "tuition": [
+        { "id": 1, "name": "Per Credit Hour", "amount": 250, "is_per_credit": true },
+        { "id": 2, "name": "Registration Fee", "amount": 175, "is_per_credit": false }
+    ],
+    "bus": [
+        { "id": 3, "name": "Monthly Bus Pass", "amount": 160, "is_per_credit": false }
+    ]
+}
+
+Returns:
+{
+    "msg": "Fee structure updated successfully",
+    "updated_count": 3
+}
+
+Notes:
+- Updates multiple fee items at once
+- Can update name, amount, and is_per_credit flag
+- Handles batch updates efficiently
+
+
+================================================================================
+9. POST /api/finance/fee-structure/item ✅ COMPLETED
+================================================================================
+Description: Add a new fee item to a category (Admin only)
+
+Page Component: Add Fee Button
+
+Request Body:
+{
+    "category": "tuition",
+    "name": "Lab Fee",
+    "amount": 100,
+    "is_per_credit": false
+}
+
+Returns:
+{
+    "msg": "Fee item created successfully",
+    "fee": {
+        "id": 5,
+        "name": "Lab Fee",
+        "amount": 100,
+        "category": "tuition",
+        "is_per_credit": false
+    }
+}
+
+Notes:
+- Creates new fee item in specified category
+- Category must be one of: 'tuition', 'bus', or other valid categories
+
+
+================================================================================
+10. DELETE /api/finance/fee-structure/item/<item_id> ✅ COMPLETED
+================================================================================
+Description: Remove a fee item (Admin only)
+
+Page Component: Remove Fee Button (trash icon)
+
+Returns:
+{
+    "msg": "Fee item deleted successfully",
+    "id": 5
+}
+
+Notes:
+- Deletes a single fee item by ID
+- Cannot delete if fee is in use (optional validation)
+
+
+================================================================================
+11. POST /api/finance/calculate-fees ✅ COMPLETED (Optional)
+================================================================================
+Description: Calculate total fees based on parameters
+
+Page Component: Fee Calculator (real-time calculation)
+
+Request Body:
+{
+    "credit_hours": 15,
+    "faculty": "Engineering",
+    "include_bus": true
+}
+
+Returns:
+{
+    "breakdown": {
+        "tuition": 3000,
+        "registration": 150,
+        "bus": 500
+    },
+    "total": 3650,
+    "calculation_details": {
+        "per_credit_rate": 200,
+        "credit_hours": 15,
+        "tuition_formula": "15 x $200 = $3000"
+    }
+}
+
+Notes:
+- Optional endpoint - calculation can also be done client-side
+- Useful for complex fee structures with faculty-specific rates
+- Returns detailed breakdown for transparency
+
+
+================================================================================
+FEE CALCULATION PAGE - EXISTING ENDPOINTS
+================================================================================
+
+These endpoints exist but are NOT related to fee structure:
+
+1. GET /api/courses
+   - Lists courses with their fees
+   - NOT for configuring fee structure
+
+2. PUT /api/courses/<id>
+   - Updates course details including fee
+   - NOT for global fee structure management
+
+
+================================================================================
+FEE CALCULATION PAGE - DATABASE CONSIDERATIONS
+================================================================================
+
+Need to create new model: FeeStructure
+
+class FeeStructure(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(50), nullable=False)  # 'tuition', 'bus', 'other'
+    name = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Float, default=0)
+    is_per_credit = db.Column(db.Boolean, default=False)  # If true, multiply by credit hours
+    is_active = db.Column(db.Boolean, default=True)
+    display_order = db.Column(db.Integer, default=0)  # For ordering items
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+================================================================================
+FEE CALCULATION PAGE - DEVELOPMENT PRIORITY
+================================================================================
+
+Priority 1 (High):
+- /api/finance/fee-structure (GET) - Load fee structure on page load
+- /api/finance/fee-structure (PUT) - Save changes button
+
+Priority 2 (Medium):
+- /api/finance/fee-structure/item (POST) - Add new fee item
+- /api/finance/fee-structure/item/<id> (DELETE) - Remove fee item
+
+Priority 3 (Lower):
+- /api/finance/calculate-fees (POST) - Server-side calculation (optional)
+
+
+
+################################################################################
+#                         BANK RECONCILIATION PAGE                             #
+################################################################################
+
+================================================================================
+12. GET /api/finance/bank-reconciliation ✅ COMPLETED
+================================================================================
+Description: Returns bank transactions with reconciliation status and summary
+
+Page Component: Statistics Cards, Transactions Table
+
+Query Parameters:
+- status: Filter by 'matched' or 'unmatched' (optional)
+- limit: Number of records (default: 50)
+- offset: Pagination offset (default: 0)
+
+Returns:
+{
+    "summary": {
+        "total": 6,
+        "matched": 4,
+        "unmatched": 2,
+        "total_amount": 24950
+    },
+    "transactions": [
+        {
+            "id": 1,
+            "bank_ref": "REF-78945612",
+            "amount": 5200,
+            "date": "2025-12-10",
+            "bank_description": "Online Transfer - John Smith",
+            "student_id": "STD-001",
+            "student_name": "John Smith",
+            "matched_payment_id": 15,
+            "status": "Matched"
+        },
+        {
+            "id": 3,
+            "bank_ref": "REF-78945614",
+            "amount": 1850,
+            "date": "2025-12-08",
+            "bank_description": "Bank Transfer",
+            "student_id": null,
+            "student_name": null,
+            "matched_payment_id": null,
+            "status": "Unmatched"
+        }
+    ]
+}
+
+Notes:
+- Returns summary statistics for the 4 stat cards
+- Includes student name for matched transactions
+- Status can be: Matched, Unmatched, Pending
+
+
+================================================================================
+13. POST /api/finance/bank-reconciliation/sync ✅ COMPLETED
+================================================================================
+Description: Sync/import bank transactions from file or external source
+
+Page Component: Sync Bank Data Button
+
+Request Body (Option 1 - File Upload):
+{
+    "source": "file",
+    "file_data": "base64_encoded_csv_data",
+    "file_type": "csv"
+}
+
+Request Body (Option 2 - Manual Entries):
+{
+    "source": "manual",
+    "transactions": [
+        {
+            "bank_ref": "REF-123456",
+            "amount": 5000,
+            "date": "2025-12-10",
+            "description": "Online Transfer"
+        }
+    ]
+}
+
+Returns:
+{
+    "msg": "Bank data synced successfully",
+    "imported_count": 10,
+    "auto_matched": 7,
+    "unmatched": 3,
+    "duplicates_skipped": 0
+}
+
+Notes:
+- Can accept CSV file upload or manual entries
+- Automatically attempts to match transactions based on amount/reference
+- Skips duplicate transactions (by bank_ref)
+- Returns count of auto-matched vs unmatched
+
+
+================================================================================
+14. GET /api/finance/bank-reconciliation/<transaction_id> ✅ COMPLETED
+================================================================================
+Description: Get detailed information for a specific bank transaction
+
+Page Component: View Button (for matched transactions)
+
+Returns:
+{
+    "transaction": {
+        "id": 1,
+        "bank_ref": "REF-78945612",
+        "amount": 5200,
+        "date": "2025-12-10",
+        "bank_description": "Online Transfer - John Smith",
+        "status": "Matched",
+        "matched_at": "2025-12-10T15:30:00",
+        "matched_by": "admin",
+        "notes": "Auto-matched by system"
+    },
+    "matched_payment": {
+        "id": 15,
+        "student_id": 1,
+        "student_name": "John Smith",
+        "student_email": "john.s@uni.edu",
+        "amount": 5200,
+        "payment_date": "2025-12-10T14:25:00",
+        "payment_method": "BANK_TRANSFER",
+        "reference_number": "TXN123456",
+        "status": "RECEIVED"
+    },
+    "student": {
+        "id": 1,
+        "name": "John Smith",
+        "email": "john.s@uni.edu",
+        "dues_balance": 0,
+        "total_paid": 12500
+    }
+}
+
+Notes:
+- Returns full transaction details
+- Includes linked payment information if matched
+- Includes student details for context
+
+
+================================================================================
+15. PUT /api/finance/bank-reconciliation/<transaction_id>/match ✅ COMPLETED
+================================================================================
+Description: Manually match a bank transaction to a student/payment
+
+Page Component: Match Manually Button (for unmatched transactions)
+
+Request Body (Option 1 - Match to existing payment):
+{
+    "payment_id": 18,
+    "notes": "Manually matched - student confirmed"
+}
+
+Request Body (Option 2 - Create new payment and match):
+{
+    "student_id": 3,
+    "create_payment": true,
+    "payment_method": "BANK_TRANSFER",
+    "notes": "New payment created from bank transaction"
+}
+
+Returns:
+{
+    "msg": "Transaction matched successfully",
+    "transaction_id": 3,
+    "status": "Matched",
+    "payment_id": 18,
+    "student_id": 3,
+    "student_name": "Michael Brown",
+    "remaining_dues": 1650
+}
+
+Notes:
+- Can match to existing payment OR create new payment
+- Updates student dues_balance if creating new payment
+- Records who performed the match and when
+
+
+================================================================================
+16. GET /api/finance/bank-reconciliation/suggestions/<transaction_id> ✅ COMPLETED
+================================================================================
+Description: Get matching suggestions for an unmatched transaction
+
+Page Component: Match Manually Modal (suggestions list)
+
+Returns:
+{
+    "transaction": {
+        "id": 3,
+        "bank_ref": "REF-78945614",
+        "amount": 1850,
+        "date": "2025-12-08"
+    },
+    "suggestions": [
+        {
+            "type": "student",
+            "student_id": 5,
+            "student_name": "James Wilson",
+            "student_email": "james.w@uni.edu",
+            "dues_balance": 1850,
+            "match_confidence": "HIGH",
+            "reason": "Exact amount match with outstanding dues"
+        },
+        {
+            "type": "student",
+            "student_id": 8,
+            "student_name": "Jennifer Taylor",
+            "student_email": "jennifer.t@uni.edu",
+            "dues_balance": 2000,
+            "match_confidence": "MEDIUM",
+            "reason": "Similar amount (within 10%)"
+        },
+        {
+            "type": "payment",
+            "payment_id": 22,
+            "student_name": "Lisa Anderson",
+            "amount": 1850,
+            "payment_date": "2025-12-08",
+            "match_confidence": "HIGH",
+            "reason": "Exact amount and date match"
+        }
+    ],
+    "unmatched_students": [
+        {
+            "student_id": 3,
+            "student_name": "Michael Brown",
+            "dues_balance": 3000
+        }
+    ]
+}
+
+Notes:
+- Returns AI/algorithm-based suggestions for matching
+- Confidence levels: HIGH (exact match), MEDIUM (similar), LOW (possible)
+- Also returns list of students with unpaid dues for manual selection
+
+
+================================================================================
+BANK RECONCILIATION PAGE - EXISTING ENDPOINTS
+================================================================================
+
+These endpoints exist but are NOT directly for bank reconciliation:
+
+1. POST /api/finance/record-payment
+   - Records external payment
+   - Can be used AFTER matching to create payment record
+
+2. GET /api/finance/dues
+   - Lists students with dues
+   - Useful for matching suggestions
+
+
+================================================================================
+BANK RECONCILIATION PAGE - DATABASE CONSIDERATIONS
+================================================================================
+
+Need to create new model: BankTransaction
+
+class BankTransaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    bank_ref = db.Column(db.String(100), unique=True, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    transaction_date = db.Column(db.DateTime, nullable=False)
+    bank_description = db.Column(db.String(255))
+    status = db.Column(db.String(20), default='Unmatched')  # Matched, Unmatched, Pending
+    matched_payment_id = db.Column(db.Integer, db.ForeignKey('payment.id'), nullable=True)
+    matched_student_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    matched_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    matched_at = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    matched_payment = db.relationship('Payment', foreign_keys=[matched_payment_id])
+    matched_student = db.relationship('User', foreign_keys=[matched_student_id])
+    matcher = db.relationship('User', foreign_keys=[matched_by])
+
+
+================================================================================
+BANK RECONCILIATION PAGE - DEVELOPMENT PRIORITY
+================================================================================
+
+Priority 1 (High):
+- /api/finance/bank-reconciliation (GET) - Load transactions table
+- /api/finance/bank-reconciliation/<id>/match (PUT) - Manual matching
+
+Priority 2 (Medium):
+- /api/finance/bank-reconciliation/sync (POST) - Sync bank data
+- /api/finance/bank-reconciliation/<id> (GET) - View transaction details
+
+Priority 3 (Lower):
+- /api/finance/bank-reconciliation/suggestions/<id> (GET) - Matching suggestions
+
+
+
+################################################################################
+#                              REPORTS PAGE                                    #
+################################################################################
+
+================================================================================
+REPORTS PAGE - EXISTING ENDPOINTS
+================================================================================
+
+These endpoints already exist and can be used for reports:
+
+1. GET /api/finance/unpaid-report
+   - Returns: Detailed report of students with outstanding dues
+   - Categorizes by severity: critical (>$5000), moderate ($1000-$5000), low (<$1000)
+   - Use for: Student Level Report (unpaid students section)
+   - Response: { report_date, total_students, total_outstanding, students_by_status, detailed_report }
+
+2. GET /api/finance/reports/status
+   - Returns: Pass/Fail status report based on student dues
+   - Use for: Student Level Report (pass/fail status)
+   - Response: { report_date, total_students, pass_count, fail_count, pass_students[], fail_students[] }
+
+3. GET /api/finance/dues
+   - Returns: List of students with outstanding dues
+   - Use for: Student Level Report (dues summary)
+   - Response: { total_students_with_dues, total_outstanding_amount, students[] }
+
+
+================================================================================
+17. GET /api/finance/reports/types
+================================================================================
+Description: Get available report types and configuration options
+
+Page Component: Predefined Reports Grid, Report Type Dropdown
+
+Returns:
+{
+    "report_types": [
+        {
+            "id": "student_level",
+            "name": "Student Level Report",
+            "description": "Individual student payment history and outstanding balances",
+            "icon": "user",
+            "available_formats": ["pdf", "excel", "json"]
+        },
+        {
+            "id": "faculty_level",
+            "name": "Faculty Level Report",
+            "description": "Aggregated payment data by faculty/department",
+            "icon": "building",
+            "available_formats": ["pdf", "excel", "json"]
+        },
+        {
+            "id": "university_level",
+            "name": "University Level Report",
+            "description": "Complete university-wide financial overview",
+            "icon": "chart",
+            "available_formats": ["pdf", "excel", "json"]
+        },
+        {
+            "id": "finance_overview",
+            "name": "Finance Overview",
+            "description": "Summary of all financial transactions and metrics",
+            "icon": "document",
+            "available_formats": ["pdf", "excel", "json"]
+        }
+    ],
+    "faculties": ["All Faculties", "Engineering", "Computer Science", "Digital Arts", "Business"]
+}
+
+Notes:
+- Can be hardcoded or stored in database
+- Provides configuration for report generator form
+
+
+================================================================================
+18. POST /api/finance/reports/generate
+================================================================================
+Description: Generate a custom report based on parameters
+
+Page Component: Generate Report Button, Download PDF/Excel Buttons
+
+Request Body:
+{
+    "report_type": "student_level",
+    "faculty": "Engineering",
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31",
+    "format": "json",
+    "save_to_history": true
+}
+
+Returns (for JSON format):
+{
+    "report_id": "RPT-2025-001",
+    "report_name": "Student Level Report - Engineering - 2025",
+    "report_type": "student_level",
+    "generated_at": "2025-12-10T15:30:00",
+    "parameters": {
+        "faculty": "Engineering",
+        "date_range": "2025-01-01 to 2025-12-31"
+    },
+    "summary": {
+        "total_students": 150,
+        "total_fees": 1875000,
+        "total_collected": 1625000,
+        "total_pending": 250000,
+        "collection_rate": 86.7,
+        "paid_count": 120,
+        "pending_count": 20,
+        "unpaid_count": 10
+    },
+    "data": [
+        {
+            "student_id": "STD-001",
+            "name": "John Smith",
+            "email": "john.s@uni.edu",
+            "total_fees": 12500,
+            "paid": 12500,
+            "dues": 0,
+            "status": "Paid",
+            "last_payment_date": "2025-09-15"
+        }
+    ]
+}
+
+Returns (for PDF/Excel format):
+{
+    "report_id": "RPT-2025-001",
+    "download_url": "/api/finance/reports/download/RPT-2025-001?format=pdf",
+    "expires_at": "2025-12-17T15:30:00"
+}
+
+Notes:
+- Generates report based on type and filters
+- Can return JSON data or file download URL
+- Optionally saves to report history
+
+
+================================================================================
+19. GET /api/finance/reports/download/<report_id>
+================================================================================
+Description: Download a generated report in specified format
+
+Page Component: Download PDF Button, Download Excel Button
+
+Query Parameters:
+- format: 'pdf' or 'excel' (required)
+
+Response:
+- Binary file download
+- Content-Type: application/pdf or application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+- Content-Disposition: attachment; filename="report_name.pdf"
+
+Notes:
+- Returns binary file for download
+- Report must exist (either just generated or from history)
+- Reports may have expiration time
+
+
+================================================================================
+20. GET /api/finance/reports/history
+================================================================================
+Description: Get list of recently generated reports
+
+Page Component: Recent Reports List
+
+Query Parameters:
+- limit: Number of records (default: 10)
+- offset: Pagination offset (default: 0)
+- report_type: Filter by type (optional)
+
+Returns:
+{
+    "reports": [
+        {
+            "id": "RPT-2025-001",
+            "name": "December 2025 Finance Overview",
+            "report_type": "finance_overview",
+            "report_type_display": "Finance Overview",
+            "generated_at": "2025-12-10T15:30:00",
+            "generated_by": "admin",
+            "parameters": {
+                "faculty": "All",
+                "date_range": "Dec 1-31, 2025"
+            },
+            "file_size_pdf": "245 KB",
+            "file_size_excel": "180 KB",
+            "available_formats": ["pdf", "excel"]
+        },
+        {
+            "id": "RPT-2025-002",
+            "name": "Engineering Faculty Report Q4",
+            "report_type": "faculty_level",
+            "report_type_display": "Faculty Level",
+            "generated_at": "2025-12-08T10:00:00",
+            "generated_by": "admin",
+            "parameters": {
+                "faculty": "Engineering",
+                "date_range": "Oct-Dec 2025"
+            }
+        }
+    ],
+    "total_count": 25,
+    "has_more": true
+}
+
+Notes:
+- Returns paginated list of saved reports
+- Each report can be re-downloaded
+
+
+================================================================================
+21. GET /api/finance/reports/faculty-summary
+================================================================================
+Description: Get faculty-level aggregated data for Faculty Level Report
+
+Page Component: Faculty Level Report Card
+
+Query Parameters:
+- start_date: Filter start date (optional)
+- end_date: Filter end date (optional)
+
+Returns:
+{
+    "report_date": "2025-12-10T15:30:00",
+    "date_range": {
+        "start": "2025-01-01",
+        "end": "2025-12-31"
+    },
+    "faculties": [
+        {
+            "name": "Engineering",
+            "total_students": 450,
+            "total_fees": 5625000,
+            "total_collected": 4850000,
+            "total_pending": 775000,
+            "collection_rate": 86.2,
+            "paid_students": 380,
+            "pending_students": 50,
+            "unpaid_students": 20
+        },
+        {
+            "name": "Computer Science",
+            "total_students": 380,
+            "total_fees": 4484000,
+            "total_collected": 4100000,
+            "total_pending": 384000,
+            "collection_rate": 91.4,
+            "paid_students": 350,
+            "pending_students": 20,
+            "unpaid_students": 10
+        }
+    ],
+    "totals": {
+        "total_students": 1200,
+        "total_fees": 14000000,
+        "total_collected": 12500000,
+        "total_pending": 1500000,
+        "overall_collection_rate": 89.3
+    }
+}
+
+Notes:
+- Aggregates data by faculty/department
+- Requires 'faculty' field on Course or Enrollment model
+
+
+================================================================================
+22. GET /api/finance/reports/university-summary
+================================================================================
+Description: Get university-wide overview data for University Level Report
+
+Page Component: University Level Report Card
+
+Query Parameters:
+- start_date: Filter start date (optional)
+- end_date: Filter end date (optional)
+
+Returns:
+{
+    "report_date": "2025-12-10T15:30:00",
+    "period": "Academic Year 2025-2026",
+    "overview": {
+        "total_students": 2847,
+        "total_enrolled_courses": 8500,
+        "total_fees_expected": 35000000,
+        "total_collected": 32000000,
+        "total_pending": 3000000,
+        "collection_rate": 91.4
+    },
+    "by_status": {
+        "paid": { "count": 2400, "percentage": 84.3 },
+        "pending": { "count": 300, "percentage": 10.5 },
+        "unpaid": { "count": 147, "percentage": 5.2 }
+    },
+    "monthly_trends": [
+        { "month": "Sep 2025", "collected": 8000000, "target": 8500000, "rate": 94.1 },
+        { "month": "Oct 2025", "collected": 7500000, "target": 7000000, "rate": 107.1 },
+        { "month": "Nov 2025", "collected": 9000000, "target": 9500000, "rate": 94.7 },
+        { "month": "Dec 2025", "collected": 7500000, "target": 10000000, "rate": 75.0 }
+    ],
+    "by_payment_method": [
+        { "method": "Online", "amount": 20000000, "count": 5000, "percentage": 62.5 },
+        { "method": "Bank Transfer", "amount": 10000000, "count": 2000, "percentage": 31.25 },
+        { "method": "Cash", "amount": 2000000, "count": 500, "percentage": 6.25 }
+    ],
+    "by_faculty": [
+        { "faculty": "Engineering", "collected": 4850000, "percentage": 15.2 },
+        { "faculty": "Computer Science", "collected": 4100000, "percentage": 12.8 }
+    ]
+}
+
+Notes:
+- Comprehensive university-wide financial data
+- Includes trends, breakdowns by various dimensions
+
+
+================================================================================
+23. DELETE /api/finance/reports/<report_id> (Optional)
+================================================================================
+Description: Delete a saved report from history
+
+Page Component: (Future feature - delete button on recent reports)
+
+Returns:
+{
+    "msg": "Report deleted successfully",
+    "report_id": "RPT-2025-001"
+}
+
+Notes:
+- Optional feature for managing report history
+- May want to implement auto-cleanup instead
+
+
+================================================================================
+REPORTS PAGE - DATABASE CONSIDERATIONS
+================================================================================
+
+Need to create new model: GeneratedReport
+
+class GeneratedReport(db.Model):
+    id = db.Column(db.String(20), primary_key=True)  # RPT-2025-001
+    name = db.Column(db.String(200), nullable=False)
+    report_type = db.Column(db.String(50), nullable=False)  # student_level, faculty_level, etc.
+    parameters = db.Column(db.JSON)  # Store filter parameters as JSON
+    file_path_pdf = db.Column(db.String(255))
+    file_path_excel = db.Column(db.String(255))
+    file_size_pdf = db.Column(db.Integer)  # Size in bytes
+    file_size_excel = db.Column(db.Integer)
+    generated_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime)  # For auto-cleanup
+    
+    # Relationship
+    generator = db.relationship('User', foreign_keys=[generated_by])
+
+
+Also consider adding 'faculty' field to Course model for faculty-level reports:
+
+class Course(db.Model):
+    # ... existing fields ...
+    faculty = db.Column(db.String(100))  # Engineering, Computer Science, etc.
+
+
+================================================================================
+REPORTS PAGE - DEVELOPMENT PRIORITY
+================================================================================
+
+Priority 1 (High):
+- /api/finance/reports/generate (POST) - Main report generator
+- /api/finance/reports/download/<id> (GET) - Download PDF/Excel
+
+Priority 2 (Medium):
+- /api/finance/reports/history (GET) - Recent reports list
+- /api/finance/reports/faculty-summary (GET) - Faculty report data
+- /api/finance/reports/university-summary (GET) - University report data
+
+Priority 3 (Lower):
+- /api/finance/reports/types (GET) - Report types config
+- /api/finance/reports/<id> (DELETE) - Delete old reports
+
+
+
+################################################################################
+#                          UNPAID STUDENTS PAGE                                #
+################################################################################
+
+================================================================================
+UNPAID STUDENTS PAGE - EXISTING ENDPOINTS
+================================================================================
+
+These endpoints already exist and can be used:
+
+1. GET /api/finance/dues
+   - Returns: List of students with outstanding dues
+   - Use for: Statistics Cards (Unpaid Count, Total Outstanding), Students Table
+   - Response: { total_students_with_dues, total_outstanding_amount, students[] }
+
+2. GET /api/finance/unpaid-report
+   - Returns: Detailed report with categorization
+   - Use for: Enhanced student data, overdue calculations
+   - Response: { report_date, total_students, total_outstanding, students_by_status, detailed_report }
+
+3. PUT /api/finance/action/contact/<student_id>
+   - Returns: Contact action logged
+   - Use for: Send Reminder button (individual)
+   - Body: { contact_method, notes }
+   - Response: { msg, action_id, student_id, contact_date }
+
+4. POST /api/finance/record-payment
+   - Returns: Payment recorded
+   - Use for: Recording payments after contact
+   - Body: { student_id, amount, payment_method, reference_number, notes }
+   - Response: { msg, payment_id, student_id, amount, remaining_dues }
+
+
+================================================================================
+24. GET /api/finance/unpaid-students (Enhanced) ✅ COMPLETED
+================================================================================
+Description: Returns unpaid students with all required fields for the page
+
+Page Component: Students Table with full details
+
+Returns:
+{
+    "summary": {
+        "unpaid_count": 5,
+        "total_outstanding": 47400,
+        "overdue_count": 2,
+        "due_today_count": 1,
+        "due_soon_count": 2
+    },
+    "students": [
+        {
+            "id": 1,
+            "user_id": 5,
+            "name": "James Wilson",
+            "student_id": "STD-005",
+            "email": "james.w@uni.edu",
+            "faculty": "Engineering",
+            "outstanding": 12500,
+            "due_date": "2025-12-15",
+            "days_overdue": 0,
+            "status": "Due Today",
+            "is_blocked": false,
+            "last_reminder_sent": "2025-12-01"
+        }
+    ]
+}
+
+Notes:
+- Enhanced version of /api/finance/dues with additional fields
+- Includes due_date, days_overdue, status calculation
+- Includes faculty information
+- Includes blocking status
+
+
+================================================================================
+25. PUT /api/finance/action/penalty/<student_id> ✅ COMPLETED
+================================================================================
+Description: Apply late fee penalty to a student
+
+Page Component: Apply Penalty button (individual)
+
+Request Body:
+{
+    "penalty_amount": 50,
+    "penalty_type": "LATE_FEE",
+    "notes": "Late payment penalty - 11 days overdue"
+}
+
+Returns:
+{
+    "msg": "Penalty applied successfully",
+    "student_id": 12,
+    "penalty_amount": 50,
+    "new_dues_balance": 8550,
+    "penalty_id": 1
+}
+
+Notes:
+- Adds penalty amount to student's dues_balance
+- Creates penalty record in database
+- Sends notification to student
+
+
+================================================================================
+26. PUT /api/finance/action/block/<student_id> ✅ COMPLETED
+================================================================================
+Description: Block student registration due to unpaid dues
+
+Page Component: Block Registration button (individual)
+
+Request Body:
+{
+    "block_type": "REGISTRATION",
+    "reason": "Outstanding dues over 7 days",
+    "notes": "Blocked due to unpaid fees"
+}
+
+Returns:
+{
+    "msg": "Registration blocked successfully",
+    "student_id": 12,
+    "blocked_at": "2025-12-10T15:30:00",
+    "block_type": "REGISTRATION"
+}
+
+Notes:
+- Sets is_blocked flag on student
+- Records blocking reason and timestamp
+- Prevents student from enrolling in new courses
+
+
+================================================================================
+27. POST /api/finance/action/bulk-reminder ✅ COMPLETED
+================================================================================
+Description: Send reminders to multiple students
+
+Page Component: Send Bulk Reminder button
+
+Request Body:
+{
+    "student_ids": [1, 2, 3, 4, 5],
+    "message_template": "default",
+    "contact_method": "EMAIL"
+}
+
+// Or send to all unpaid:
+{
+    "student_ids": "all",
+    "message_template": "default",
+    "contact_method": "EMAIL"
+}
+
+Returns:
+{
+    "msg": "Bulk reminders sent successfully",
+    "sent_count": 5,
+    "failed_count": 0,
+    "notifications_created": 5,
+    "details": [
+        { "student_id": 1, "status": "sent" },
+        { "student_id": 2, "status": "sent" }
+    ]
+}
+
+Notes:
+- Sends email/notification to multiple students
+- Creates notification records for each student
+- Logs action for each contact
+
+
+================================================================================
+28. POST /api/finance/action/bulk-penalty ✅ COMPLETED
+================================================================================
+Description: Apply penalties to multiple students
+
+Page Component: Apply Late Penalties button
+
+Request Body:
+{
+    "student_ids": [2, 3, 5],
+    "penalty_amount": 50,
+    "penalty_type": "LATE_FEE"
+}
+
+Returns:
+{
+    "msg": "Bulk penalties applied successfully",
+    "applied_count": 3,
+    "total_penalties": 150,
+    "details": [
+        { "student_id": 2, "penalty_amount": 50, "new_dues": 11250 },
+        { "student_id": 3, "penalty_amount": 50, "new_dues": 8550 }
+    ]
+}
+
+Notes:
+- Applies same penalty amount to multiple students
+- Only applies to students who are overdue
+- Creates penalty records for each student
+
+
+================================================================================
+29. POST /api/finance/action/bulk-block ✅ COMPLETED
+================================================================================
+Description: Block registrations for multiple students
+
+Page Component: Block Registrations button
+
+Request Body:
+{
+    "student_ids": [3, 5],
+    "block_type": "REGISTRATION",
+    "reason": "Outstanding dues over 7 days"
+}
+
+Returns:
+{
+    "msg": "Bulk registrations blocked successfully",
+    "blocked_count": 2,
+    "details": [
+        { "student_id": 3, "blocked_at": "2025-12-10T15:30:00" },
+        { "student_id": 5, "blocked_at": "2025-12-10T15:30:00" }
+    ]
+}
+
+Notes:
+- Blocks multiple students at once
+- Typically used for severely overdue students (>7 days)
+- Records blocking reason for each student
+
+
+================================================================================
+UNPAID STUDENTS PAGE - DATABASE CONSIDERATIONS
+================================================================================
+
+✅ COMPLETED: Added fields to User model:
+- is_blocked (Boolean, default=False)
+- blocked_at (DateTime, nullable=True)
+- blocked_reason (String(255), nullable=True)
+- payment_due_date (DateTime, nullable=True)
+
+✅ COMPLETED: Created Penalty model:
+- id (Integer, Primary Key)
+- student_id (Integer, Foreign Key to User)
+- amount (Float, nullable=False)
+- penalty_type (String(50)) - LATE_FEE, etc.
+- applied_by (Integer, Foreign Key to User)
+- applied_at (DateTime, default=datetime.utcnow)
+- notes (Text, nullable=True)
+- Relationships: student, applied_by_user
+
+
+================================================================================
+UNPAID STUDENTS PAGE - DEVELOPMENT PRIORITY
+================================================================================
+
+Priority 1 (High):
+- /api/finance/unpaid-students (GET) - Enhanced endpoint with all fields
+- /api/finance/action/penalty/<id> (PUT) - Individual penalty
+
+Priority 2 (Medium):
+- /api/finance/action/block/<id> (PUT) - Individual block
+- /api/finance/action/bulk-reminder (POST) - Bulk email reminders
+
+Priority 3 (Lower):
+- /api/finance/action/bulk-penalty (POST) - Bulk penalties
+- /api/finance/action/bulk-block (POST) - Bulk blocking
+
+
+================================================================================
+

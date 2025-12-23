@@ -111,7 +111,8 @@
 }
 
 /* Card Details Section */
-.card-details-section {
+.card-details-section,
+.bank-details-section {
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
@@ -165,6 +166,85 @@
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
 }
+
+/* Bank Info Card Styles */
+.bank-info-card {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.bank-info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.bank-info-row:last-child {
+  margin-bottom: 0;
+}
+
+.bank-info-row .label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.bank-info-row .value {
+  color: #0f172a;
+  font-weight: 600;
+  font-family: monospace;
+  font-size: 1rem;
+}
+
+/* File Upload Styles */
+.file-upload-area {
+  border: 2px dashed #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.2s;
+  background-color: #f8fafc;
+  cursor: pointer;
+}
+
+.file-upload-area:hover {
+  border-color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.file-upload-area.invalid {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.file-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  color: #64748b;
+  font-size: 0.9375rem;
+}
+
+.upload-icon {
+  width: 32px;
+  height: 32px;
+  color: #64748b;
+}
+
+.file-upload-area:hover .upload-icon {
+  color: #10b981;
+}
+
+.file-name {
+  color: #10b981;
+  font-weight: 600;
+}
+
 
 /* Right Section - Payment Summary */
 .payment-summary-section {
@@ -353,7 +433,8 @@
 }
 
 .input-with-icon input.invalid,
-.form-group input.invalid {
+.form-group input.invalid,
+.file-upload-area.invalid {
   border-color: #ef4444;
 }
 

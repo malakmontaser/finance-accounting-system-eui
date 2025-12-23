@@ -185,15 +185,6 @@
   background-color: #fecaca;
   border-color: #fca5a5;
 }
-
-.btn-drop:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background-color: #f3f4f6;
-  color: #9ca3af;
-  border-color: #e5e7eb;
-}
-
 .enrolled-badge {
   width: 24px;
   height: 24px;

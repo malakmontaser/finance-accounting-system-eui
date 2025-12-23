@@ -1,40 +1,74 @@
-# Dependencies
-/node_modules
-/.pnp
-.pnp.js
+# ============================================================================
+# Environment Variables & Secrets (CRITICAL!)
+# ============================================================================
+.env
+.env.local
+.env.*.local
+*.env
 
-# Testing
-/coverage
+# ============================================================================
+# Python / Backend
+# ============================================================================
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
 
-# Production
-/build
-/dist
-.next/
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 
-# Misc
-.DS_Store
-*.pem
+# Flask instance folder (contains database)
+instance/
+*.db
+*.sqlite
+*.sqlite3
 
-# Debug logs
+# Python distribution
+build/
+dist/
+*.egg-info/
+*.egg
+
+# ============================================================================
+# Node.js / Frontend
+# ============================================================================
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Build outputs
+dist/
+dist-ssr/
+build/
+*.local
 
-# IDE specific files
-.idea/
+# ============================================================================
+# IDE & Editor Files
+# ============================================================================
 .vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Visual Studio / Windows specific
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
+<<<<<<< HEAD
 # Environment variables
 .env
 
@@ -130,3 +164,25 @@ logs
 .temp/
 .tmp/
 .temp*
+=======
+# ============================================================================
+# Logs & Temporary Files
+# ============================================================================
+logs/
+*.log
+lint_log.txt
+*.tmp
+*.temp
+*.bak
+
+# ============================================================================
+# OS Files
+# ============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+>>>>>>> finance-frontend

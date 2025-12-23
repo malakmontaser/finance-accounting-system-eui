@@ -6,8 +6,12 @@
 }
 
 /* Page Header */
+/* Page Header */
 .history-page-header {
   margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
 }
 
 .history-page-title {
@@ -21,6 +25,30 @@
   font-size: 1rem;
   color: #6b7280;
   margin: 0;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.export-btn:hover {
+  background-color: #f9fafb;
+}
+
+.btn-icon {
+  width: 18px;
+  height: 18px;
 }
 
 /* Alert */
@@ -94,13 +122,14 @@
 }
 
 .filter-tab:hover {
-  background-color: #f3f4f6;
-  color: #111827;
+  background-color: rgba(251, 191, 36, 0.1);
+  color: #0f172a;
 }
 
 .filter-tab.active {
-  background-color: #10b981;
-  color: white;
+  background-color: #fbbf24;
+  color: #0f172a;
+  font-weight: 700;
 }
 
 /* Transaction Section */
@@ -123,7 +152,7 @@
 .section-icon {
   width: 24px;
   height: 24px;
-  color: #10b981;
+  color: #fbbf24;
 }
 
 .section-title {
