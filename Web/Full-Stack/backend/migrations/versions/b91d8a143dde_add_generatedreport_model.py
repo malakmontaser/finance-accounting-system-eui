@@ -1,7 +1,7 @@
 """Add GeneratedReport model
 
 Revision ID: b91d8a143dde
-Revises: f8d12c6c8a32
+Revises: 0bb6a8879c7c
 Create Date: 2025-12-22 00:40:46.468138
 
 """
