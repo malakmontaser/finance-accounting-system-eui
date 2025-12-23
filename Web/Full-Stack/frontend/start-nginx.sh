@@ -1,6 +1,7 @@
 #!/bin/sh
-# Replace $PORT in nginx.conf template
-sed -i "s/\${PORT}/${PORT:-80}/g" /etc/nginx/conf.d/default.conf
+# Replace PORT_PLACEHOLDER in nginx.conf template
+echo "Configuring Nginx to listen on port ${PORT:-80}..."
+sed -i "s/PORT_PLACEHOLDER/${PORT:-80}/g" /etc/nginx/conf.d/default.conf
 
 # Start nginx
-nginx -g "daemon off;"
+exec nginx -g "daemon off;"
