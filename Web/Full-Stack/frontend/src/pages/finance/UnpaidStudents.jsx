@@ -23,11 +23,11 @@ const UnpaidStudents = () => {
         const fetchUnpaidStudents = async () => {
             setLoading(true);
             setError(null);
-
+            
             try {
                 // ✅ Use enhanced API to get unpaid students data
                 const data = await unpaidStudentsService.getUnpaidStudents();
-
+                
                 setStudents(data.students);
                 setStats({
                     unpaidCount: data.summary.unpaid_count,
@@ -50,7 +50,7 @@ const UnpaidStudents = () => {
     // ============================================================================
     const handleSendReminder = async (studentId) => {
         setActionLoading(`reminder-${studentId}`);
-
+        
         try {
             // Find student to get user_id
             const student = students.find(s => s.student_id === studentId);
@@ -64,9 +64,9 @@ const UnpaidStudents = () => {
                 contact_method: 'EMAIL',
                 notes: 'Payment reminder sent from Unpaid Students page'
             });
-
+            
             alert(`Reminder sent to student ${studentId}`);
-
+            
             // Refresh data
             const data = await unpaidStudentsService.getUnpaidStudents();
             setStudents(data.students);
@@ -94,16 +94,16 @@ const UnpaidStudents = () => {
         }
 
         setActionLoading(`penalty-${studentId}`);
-
+        
         try {
             await unpaidStudentsService.applyPenalty(student.user_id || student.id, {
                 penalty_amount: parseFloat(penaltyAmount),
                 penalty_type: 'LATE_FEE',
                 notes: `Late payment penalty applied - ${student.days_overdue || 0} days overdue`
             });
-
+            
             alert(`Penalty of $${penaltyAmount} applied successfully to ${student.name}`);
-
+            
             // Refresh data
             const data = await unpaidStudentsService.getUnpaidStudents();
             setStudents(data.students);
@@ -132,16 +132,16 @@ const UnpaidStudents = () => {
 
         if (window.confirm(`Are you sure you want to block registration for ${student.name}?`)) {
             setActionLoading(`block-${studentId}`);
-
+            
             try {
                 await unpaidStudentsService.blockStudent(student.user_id || student.id, {
                     block_type: 'REGISTRATION',
                     reason: `Outstanding dues of $${student.outstanding} - ${student.days_overdue || 0} days overdue`,
                     notes: 'Blocked from Unpaid Students page'
                 });
-
+                
                 alert(`Registration blocked successfully for ${student.name}`);
-
+                
                 // Refresh data
                 const data = await unpaidStudentsService.getUnpaidStudents();
                 setStudents(data.students);
@@ -165,16 +165,16 @@ const UnpaidStudents = () => {
 
         if (window.confirm(`Send reminders to all ${students.length} unpaid students?`)) {
             setActionLoading('bulk-reminder');
-
+            
             try {
                 const result = await unpaidStudentsService.sendBulkReminders({
                     student_ids: 'all',
                     message_template: 'default',
                     contact_method: 'EMAIL'
                 });
-
+                
                 alert(`Bulk reminders sent successfully!\nSent: ${result.sent_count}\nFailed: ${result.failed_count}`);
-
+                
                 // Refresh data
                 const data = await unpaidStudentsService.getUnpaidStudents();
                 setStudents(data.students);
@@ -204,7 +204,7 @@ const UnpaidStudents = () => {
 
         if (window.confirm(`Apply $${penaltyAmount} penalty to ${overdueStudents.length} overdue students?`)) {
             setActionLoading('bulk-penalty');
-
+            
             try {
                 const studentIds = overdueStudents.map(s => s.user_id || s.id);
                 const result = await unpaidStudentsService.applyBulkPenalties({
@@ -212,9 +212,9 @@ const UnpaidStudents = () => {
                     penalty_amount: parseFloat(penaltyAmount),
                     penalty_type: 'LATE_FEE'
                 });
-
+                
                 alert(`Bulk penalties applied successfully!\nApplied to: ${result.applied_count} students\nTotal penalties: $${result.total_penalties}`);
-
+                
                 // Refresh data
                 const data = await unpaidStudentsService.getUnpaidStudents();
                 setStudents(data.students);
@@ -241,10 +241,10 @@ const UnpaidStudents = () => {
             alert('No severely overdue students found.');
             return;
         }
-
+        
         if (window.confirm(`Block registration for ${severelyOverdue.length} students with overdue payments (>7 days)?`)) {
             setActionLoading('bulk-block');
-
+            
             try {
                 const studentIds = severelyOverdue.map(s => s.user_id || s.id);
                 const result = await unpaidStudentsService.blockBulkRegistrations({
@@ -252,9 +252,9 @@ const UnpaidStudents = () => {
                     block_type: 'REGISTRATION',
                     reason: 'Outstanding dues over 7 days'
                 });
-
+                
                 alert(`Bulk registrations blocked successfully!\nBlocked: ${result.blocked_count} students`);
-
+                
                 // Refresh data
                 const data = await unpaidStudentsService.getUnpaidStudents();
                 setStudents(data.students);
@@ -271,7 +271,7 @@ const UnpaidStudents = () => {
         // Use status field if available, otherwise calculate from days_overdue
         const daysOverdue = student.days_overdue || 0;
         const status = student.status || '';
-
+        
         if (daysOverdue > 7 || status === 'Critical') return 'status-severe-overdue';
         if (daysOverdue > 0 || status === 'Moderate') return 'status-overdue';
         if (status === 'Due Today') return 'status-due-today';
@@ -373,8 +373,8 @@ const UnpaidStudents = () => {
 
             {/* Action Buttons */}
             <div className="action-buttons-bar">
-                <button
-                    className="action-btn reminder-btn"
+                <button 
+                    className="action-btn reminder-btn" 
                     onClick={handleSendBulkReminder}
                     disabled={actionLoading === 'bulk-reminder' || students.length === 0}
                 >
@@ -389,8 +389,8 @@ const UnpaidStudents = () => {
                         </>
                     )}
                 </button>
-                <button
-                    className="action-btn penalties-btn"
+                <button 
+                    className="action-btn penalties-btn" 
                     onClick={handleApplyLatePenalties}
                     disabled={actionLoading === 'bulk-penalty' || students.filter(s => (s.days_overdue || 0) > 0).length === 0}
                 >
@@ -403,8 +403,8 @@ const UnpaidStudents = () => {
                         </>
                     )}
                 </button>
-                <button
-                    className="action-btn block-btn"
+                <button 
+                    className="action-btn block-btn" 
                     onClick={handleBlockRegistrations}
                     disabled={actionLoading === 'bulk-block' || students.filter(s => (s.days_overdue || 0) > 7).length === 0}
                 >

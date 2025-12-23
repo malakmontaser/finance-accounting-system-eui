@@ -30,7 +30,7 @@ const Reports = () => {
             try {
                 setLoadingReportTypes(true);
                 const data = await reportsService.getReportTypes();
-
+                
                 // Set report types
                 const types = data.report_types.map(rt => ({
                     id: rt.id,
@@ -42,10 +42,10 @@ const Reports = () => {
                     available: true  // ✅ All APIs are now available
                 }));
                 setPredefinedReports(types);
-
+                
                 // Set report type options for dropdown
                 setReportTypes(data.report_types.map(rt => rt.name));
-
+                
                 // Set faculties
                 if (data.faculties && data.faculties.length > 0) {
                     setFaculties(data.faculties);
@@ -69,7 +69,7 @@ const Reports = () => {
             try {
                 setLoadingRecentReports(true);
                 const data = await reportsService.getReportHistory({ limit: 10 });
-
+                
                 if (data.reports) {
                     const formattedReports = data.reports.map(report => ({
                         id: report.id,
@@ -117,7 +117,7 @@ const Reports = () => {
     // ============================================================================
     const downloadAsCSV = (data, filename) => {
         let csvContent = '';
-
+        
         if (data.students && Array.isArray(data.students)) {
             // Header
             csvContent = 'Student ID,Username,Email,Dues Balance,Total Enrollments,Last Payment Date\n';
@@ -133,7 +133,7 @@ const Reports = () => {
                 csvContent += `${student.user_id},"${student.username}","${student.email}",${student.dues_balance},${status}\n`;
             });
         }
-
+        
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -151,7 +151,7 @@ const Reports = () => {
     const handleGenerateReport = async () => {
         setGeneratingReport(true);
         setError(null);
-
+        
         try {
             // Map report type name to API format
             const reportTypeMap = {
@@ -160,9 +160,9 @@ const Reports = () => {
                 'University Level': 'university_level',
                 'Finance Overview': 'finance_overview'
             };
-
+            
             const reportTypeId = reportTypeMap[reportType] || 'student_level';
-
+            
             // Call the generate report API
             const reportData = await reportsService.generateReport({
                 report_type: reportTypeId,
@@ -172,11 +172,11 @@ const Reports = () => {
                 format: 'json',
                 save_to_history: true
             });
-
+            
             // Download as JSON
             const filename = `${reportTypeId}-report-${new Date().toISOString().split('T')[0]}.json`;
             downloadAsJSON(reportData, filename);
-
+            
             // Refresh recent reports
             const historyData = await reportsService.getReportHistory({ limit: 10 });
             if (historyData.reports) {
@@ -194,7 +194,7 @@ const Reports = () => {
                 }));
                 setRecentReports(formattedReports);
             }
-
+            
             alert(`${reportType} report generated successfully!`);
         } catch (error) {
             console.error('Error generating report:', error);
@@ -213,7 +213,7 @@ const Reports = () => {
         if (!report) return;
 
         setDownloadingReport(`pdf-${reportId}`);
-
+        
         try {
             // Generate report with PDF format
             const reportData = await reportsService.generateReport({
@@ -224,7 +224,7 @@ const Reports = () => {
                 format: 'pdf',
                 save_to_history: false
             });
-
+            
             // For now, PDF generation returns JSON (placeholder)
             // In production, this would download actual PDF
             if (reportData.download_url) {
@@ -257,7 +257,7 @@ const Reports = () => {
         if (!report) return;
 
         setDownloadingReport(`excel-${reportId}`);
-
+        
         try {
             // Generate report with Excel format
             const reportData = await reportsService.generateReport({
@@ -268,7 +268,7 @@ const Reports = () => {
                 format: 'excel',
                 save_to_history: false
             });
-
+            
             // For now, Excel generation returns JSON (placeholder)
             // In production, this would download actual Excel
             if (reportData.download_url) {
@@ -313,11 +313,11 @@ const Reports = () => {
     // ============================================================================
     const handleExportAll = async () => {
         setLoading(true);
-
+        
         try {
             // ✅ Export all available data from existing APIs
             const data = await reportsService.getStudentLevelReportData();
-
+            
             const exportData = {
                 export_name: 'All Financial Data Export',
                 exported_at: new Date().toISOString(),
@@ -325,10 +325,10 @@ const Reports = () => {
                 status_report: data.status,
                 dues_summary: data.dues
             };
-
+            
             const filename = `finance-export-${new Date().toISOString().split('T')[0]}.json`;
             downloadAsJSON(exportData, filename);
-
+            
             alert('All available data exported successfully!');
         } catch (error) {
             console.error('Error exporting data:', error);
@@ -401,12 +401,12 @@ const Reports = () => {
 
             {/* Error Message */}
             {error && (
-                <div className="error-message" style={{
-                    padding: '1rem',
-                    margin: '1rem 0',
-                    backgroundColor: '#fee2e2',
-                    color: '#dc2626',
-                    borderRadius: '0.5rem'
+                <div className="error-message" style={{ 
+                    padding: '1rem', 
+                    margin: '1rem 0', 
+                    backgroundColor: '#fee2e2', 
+                    color: '#dc2626', 
+                    borderRadius: '0.5rem' 
                 }}>
                     {error}
                 </div>
@@ -418,50 +418,50 @@ const Reports = () => {
                     <div style={{ padding: '2rem', textAlign: 'center' }}>Loading report types...</div>
                 ) : (
                     predefinedReports.map((report) => (
-                        <div key={report.id} className="report-card">
-                            <div className="report-icon" style={{ color: report.iconColor }}>
-                                {getIcon(report.icon)}
-                            </div>
-                            <div className="report-info">
-                                <h3 className="report-title">{report.title}</h3>
-                                <p className="report-description">{report.description}</p>
-                            </div>
-                            <div className="report-actions">
-                                <button
-                                    className={`download-btn pdf-btn ${!report.available ? 'btn-disabled' : ''}`}
-                                    onClick={() => handleDownloadPDF(report.id)}
-                                    disabled={downloadingReport === `pdf-${report.id}`}
-                                    title={report.available ? "Download PDF" : "Coming soon"}
-                                >
-                                    {downloadingReport === `pdf-${report.id}` ? (
-                                        <span className="btn-loading">...</span>
-                                    ) : (
-                                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                    )}
-                                    {report.available ? 'JSON' : 'PDF'}
-                                </button>
-                                <button
-                                    className={`download-btn excel-btn ${!report.available ? 'btn-disabled' : ''}`}
-                                    onClick={() => handleDownloadExcel(report.id)}
-                                    disabled={downloadingReport === `excel-${report.id}`}
-                                    title={report.available ? "Download Excel/CSV" : "Coming soon"}
-                                >
-                                    {downloadingReport === `excel-${report.id}` ? (
-                                        <span className="btn-loading">...</span>
-                                    ) : (
-                                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                    )}
-                                    {report.available ? 'CSV' : 'Excel'}
-                                </button>
-                                {!report.available && (
-                                    <span className="coming-soon-badge">Coming Soon</span>
-                                )}
-                            </div>
+                    <div key={report.id} className="report-card">
+                        <div className="report-icon" style={{ color: report.iconColor }}>
+                            {getIcon(report.icon)}
                         </div>
+                        <div className="report-info">
+                            <h3 className="report-title">{report.title}</h3>
+                            <p className="report-description">{report.description}</p>
+                        </div>
+                        <div className="report-actions">
+                            <button
+                                className={`download-btn pdf-btn ${!report.available ? 'btn-disabled' : ''}`}
+                                onClick={() => handleDownloadPDF(report.id)}
+                                disabled={downloadingReport === `pdf-${report.id}`}
+                                title={report.available ? "Download PDF" : "Coming soon"}
+                            >
+                                {downloadingReport === `pdf-${report.id}` ? (
+                                    <span className="btn-loading">...</span>
+                                ) : (
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                )}
+                                {report.available ? 'JSON' : 'PDF'}
+                            </button>
+                            <button
+                                className={`download-btn excel-btn ${!report.available ? 'btn-disabled' : ''}`}
+                                onClick={() => handleDownloadExcel(report.id)}
+                                disabled={downloadingReport === `excel-${report.id}`}
+                                title={report.available ? "Download Excel/CSV" : "Coming soon"}
+                            >
+                                {downloadingReport === `excel-${report.id}` ? (
+                                    <span className="btn-loading">...</span>
+                                ) : (
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                )}
+                                {report.available ? 'CSV' : 'Excel'}
+                            </button>
+                            {!report.available && (
+                                <span className="coming-soon-badge">Coming Soon</span>
+                            )}
+                        </div>
+                    </div>
                     ))
                 )}
             </div>
@@ -536,15 +536,15 @@ const Reports = () => {
                     </div>
 
                     <div className="form-actions">
-                        <button
-                            className="generate-btn"
+                        <button 
+                            className="generate-btn" 
                             onClick={handleGenerateReport}
                             disabled={generatingReport}
                         >
                             {generatingReport ? 'Generating...' : 'Generate Report'}
                         </button>
-                        <button
-                            className="export-all-btn"
+                        <button 
+                            className="export-all-btn" 
                             onClick={handleExportAll}
                             disabled={loading}
                         >
@@ -576,26 +576,26 @@ const Reports = () => {
                         </div>
                     ) : (
                         recentReports.map((report) => (
-                            <div key={report.id} className="recent-report-item">
-                                <div className="report-icon-small">
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                </div>
-                                <div className="report-details">
-                                    <div className="report-name">{report.name}</div>
-                                    <div className="report-meta">{report.date}</div>
-                                </div>
-                                <button
-                                    className="download-icon-btn"
-                                    onClick={() => handleDownloadRecentReport(report.id)}
-                                    title="Download"
-                                >
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                </button>
+                        <div key={report.id} className="recent-report-item">
+                            <div className="report-icon-small">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
                             </div>
+                            <div className="report-details">
+                                <div className="report-name">{report.name}</div>
+                                <div className="report-meta">{report.date}</div>
+                            </div>
+                            <button
+                                className="download-icon-btn"
+                                onClick={() => handleDownloadRecentReport(report.id)}
+                                title="Download"
+                            >
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </button>
+                        </div>
                         ))
                     )}
                 </div>

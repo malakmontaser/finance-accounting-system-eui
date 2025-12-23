@@ -5,7 +5,7 @@ import './FinanceDashboard.css';
 
 const FinanceDashboard = () => {
   const navigate = useNavigate();
-
+  
   // Loading and error states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,7 +39,7 @@ const FinanceDashboard = () => {
     const fetchDashboardData = async () => {
       setLoading(true);
       setError(null);
-
+      
       try {
         // ✅ Fetch all dashboard data in parallel
         const [summaryData, duesData, recentPaymentsData, facultyPaymentsData, bankData] = await Promise.all([
@@ -49,7 +49,7 @@ const FinanceDashboard = () => {
           financeService.getPaymentsByFaculty(),  // ✅ New API
           financeService.getBankReconciliation({ limit: 4 })  // ✅ Bank Reconciliation API
         ]);
-
+        
         // Update stats from summary API
         setStats({
           totalCollected: summaryData.total_collected || 0,
@@ -110,7 +110,7 @@ const FinanceDashboard = () => {
       const now = new Date();
       const diffTime = Math.abs(now - date);
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
+      
       if (diffDays === 0) return 'Today';
       if (diffDays === 1) return 'Yesterday';
       if (diffDays < 7) return `${diffDays} days ago`;
@@ -141,7 +141,7 @@ const FinanceDashboard = () => {
     setReportLoading(true);
     try {
       const reportData = await financeService.getUnpaidReport();
-
+      
       // Create downloadable report
       const reportContent = JSON.stringify(reportData, null, 2);
       const blob = new Blob([reportContent], { type: 'application/json' });
@@ -153,7 +153,7 @@ const FinanceDashboard = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-
+      
       alert('Report generated successfully!');
     } catch (err) {
       console.error('Error generating report:', err);
@@ -219,8 +219,8 @@ const FinanceDashboard = () => {
           <h1 className="dashboard-title">Finance Dashboard</h1>
           <p className="dashboard-subtitle">Overview of university tuition payments</p>
         </div>
-        <button
-          className="generate-report-btn"
+        <button 
+          className="generate-report-btn" 
           onClick={handleGenerateReport}
           disabled={reportLoading}
         >

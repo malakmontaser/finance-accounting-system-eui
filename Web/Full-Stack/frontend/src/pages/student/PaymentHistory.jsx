@@ -38,7 +38,6 @@ const PaymentHistory = () => {
 
   const getFilteredPayments = () => {
     if (filter === 'all') return payments;
-<<<<<<< HEAD
     
     // Map filter values to backend status values
     const statusMap = {
@@ -49,9 +48,6 @@ const PaymentHistory = () => {
     
     const targetStatus = statusMap[filter.toLowerCase()] || filter.toUpperCase();
     return payments.filter(p => p.status.toUpperCase() === targetStatus);
-=======
-    return payments.filter(p => p.status.toLowerCase() === filter.toLowerCase());
->>>>>>> finance-frontend
   };
 
   const handleViewReceipt = (payment) => {

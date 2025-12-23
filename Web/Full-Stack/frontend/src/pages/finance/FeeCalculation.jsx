@@ -22,11 +22,11 @@ const FeeCalculation = () => {
             setLoading(true);
             setError(null);
             const data = await feeCalculationService.getFeeStructure();
-
+            
             // Transform API data to component format
             const tuitionCategory = data.categories.find(cat => cat.name === 'tuition');
             const busCategory = data.categories.find(cat => cat.name === 'bus');
-
+            
             if (tuitionCategory) {
                 setTuitionFees(tuitionCategory.fees.map(fee => ({
                     id: fee.id,
@@ -35,7 +35,7 @@ const FeeCalculation = () => {
                     is_per_credit: fee.is_per_credit
                 })));
             }
-
+            
             if (busCategory) {
                 setBusFees(busCategory.fees.map(fee => ({
                     id: fee.id,
@@ -44,7 +44,7 @@ const FeeCalculation = () => {
                     is_per_credit: fee.is_per_credit
                 })));
             }
-
+            
             if (data.faculties && data.faculties.length > 0) {
                 setFaculties(data.faculties);
                 setSelectedFaculty(prevFaculty => {
@@ -75,7 +75,7 @@ const FeeCalculation = () => {
                 amount: 0,
                 is_per_credit: category === 'tuition' ? false : false // Default to false, user can change
             });
-
+            
             // Add to local state
             const feeItem = {
                 id: newFee.fee.id,
@@ -83,7 +83,7 @@ const FeeCalculation = () => {
                 amount: newFee.fee.amount,
                 is_per_credit: newFee.fee.is_per_credit
             };
-
+            
             switch (category) {
                 case 'tuition':
                     setTuitionFees([...tuitionFees, feeItem]);
@@ -94,7 +94,7 @@ const FeeCalculation = () => {
                 default:
                     break;
             }
-
+            
             setHasChanges(true);
         } catch (err) {
             console.error('Error adding fee item:', err);
@@ -105,7 +105,7 @@ const FeeCalculation = () => {
     const removeFee = async (category, id) => {
         // Check if it's a new item (temporary ID) or existing item
         const isNewItem = typeof id === 'number' && id > 1000000000000; // Temporary IDs are timestamps
-
+        
         if (!isNewItem) {
             try {
                 // Delete via API
@@ -116,7 +116,7 @@ const FeeCalculation = () => {
                 return;
             }
         }
-
+        
         // Remove from local state
         switch (category) {
             case 'tuition':
@@ -128,7 +128,7 @@ const FeeCalculation = () => {
             default:
                 break;
         }
-
+        
         setHasChanges(true);
     };
 
@@ -146,7 +146,7 @@ const FeeCalculation = () => {
             default:
                 break;
         }
-
+        
         setHasChanges(true);
     };
 
@@ -155,7 +155,7 @@ const FeeCalculation = () => {
         // Calculate tuition fees (per credit + fixed fees)
         let tuitionTotal = 0;
         let registrationTotal = 0;
-
+        
         tuitionFees.forEach(fee => {
             if (fee.is_per_credit) {
                 tuitionTotal += (Number(fee.amount) || 0) * creditHours;
@@ -163,9 +163,9 @@ const FeeCalculation = () => {
                 registrationTotal += Number(fee.amount) || 0;
             }
         });
-
+        
         // Calculate bus fees
-        const busTotal = includeBus
+        const busTotal = includeBus 
             ? busFees.reduce((sum, fee) => sum + (Number(fee.amount) || 0), 0)
             : 0;
 
@@ -182,7 +182,7 @@ const FeeCalculation = () => {
     const handleSaveChanges = async () => {
         try {
             setSaving(true);
-
+            
             // Prepare fee structure for API
             const feeStructure = {
                 tuition: tuitionFees.map(fee => ({
@@ -198,7 +198,7 @@ const FeeCalculation = () => {
                     is_per_credit: fee.is_per_credit || false
                 }))
             };
-
+            
             await feeCalculationService.updateFeeStructure(feeStructure);
             setHasChanges(false);
             alert('Fee structure saved successfully!');
@@ -242,7 +242,7 @@ const FeeCalculation = () => {
                     <h1 className="page-title">Fee Calculation</h1>
                     <p className="page-subtitle">Configure and manage fee structures</p>
                 </div>
-                <button
+                <button 
                     className={`save-changes-btn ${saving ? 'saving' : ''} ${!hasChanges ? 'no-changes' : ''}`}
                     onClick={handleSaveChanges}
                     disabled={saving || !hasChanges}

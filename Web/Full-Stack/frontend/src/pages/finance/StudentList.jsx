@@ -57,10 +57,10 @@ const StudentList = () => {
             }
 
             const data = await studentListService.getStudents(params);
-
+            
             setStudents(data.students || []);
             setTotalCount(data.total_count || 0);
-
+            
             // Update faculties list from API
             if (data.faculties && data.faculties.length > 0) {
                 setFaculties(['All Faculties', ...data.faculties]);
@@ -95,7 +95,7 @@ const StudentList = () => {
     const handleViewStudent = async (student) => {
         // Use user_id from student object, or extract from id string
         const userId = student.user_id || parseInt(student.id.replace('STD-', ''));
-
+        
         if (!userId || isNaN(userId)) {
             console.error('Invalid student ID:', student);
             alert('Invalid student ID. Please try again.');
@@ -105,22 +105,22 @@ const StudentList = () => {
         setViewLoading(student.id);
         try {
             const data = await studentListService.getStudentDetails(userId);
-
+            
             // For now, show alert with details. Later you can open a modal or navigate to details page
             console.log('Student Details:', data);
-
+            
             // Format details for display
             const details = `Student: ${data.student.name}\n` +
-                `Email: ${data.student.email || 'N/A'}\n` +
-                `Faculty: ${data.student.faculty}\n` +
-                `Status: ${data.student.status}\n` +
-                `Total Fees: $${data.student.totalFees.toLocaleString()}\n` +
-                `Paid: $${data.student.paid.toLocaleString()}\n` +
-                `Dues: $${data.student.dues.toLocaleString()}\n\n` +
-                `Enrollments: ${data.enrollments.length}\n` +
-                `Payments: ${data.payments.length}\n` +
-                `Notifications: ${data.notifications.length}`;
-
+                          `Email: ${data.student.email || 'N/A'}\n` +
+                          `Faculty: ${data.student.faculty}\n` +
+                          `Status: ${data.student.status}\n` +
+                          `Total Fees: $${data.student.totalFees.toLocaleString()}\n` +
+                          `Paid: $${data.student.paid.toLocaleString()}\n` +
+                          `Dues: $${data.student.dues.toLocaleString()}\n\n` +
+                          `Enrollments: ${data.enrollments.length}\n` +
+                          `Payments: ${data.payments.length}\n` +
+                          `Notifications: ${data.notifications.length}`;
+            
             alert(details);
         } catch (err) {
             console.error('Error fetching student details:', err);
