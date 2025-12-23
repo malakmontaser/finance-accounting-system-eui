@@ -20,6 +20,9 @@ services:
 
   api:
     image: ${DOCKER_IMAGE_API:-seifwafeek/finance-accounting-api:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     restart: always
     environment:
       DB_USER: ${DB_USER:-fas_user}

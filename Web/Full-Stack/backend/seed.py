@@ -20,32 +20,40 @@ def seed_database():
         # Clear existing data
         print("Clearing existing data...")
         
-        # Drop orphaned tables that may have foreign key constraints
-        # These tables might exist from previous migrations but are no longer in models
+        # Disable foreign key checks and drop all tables manually
         try:
-            with db.engine.connect() as conn:
-                # Disable foreign key checks temporarily
-                conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-                
-                # Drop transactions table first (it references student_profiles)
-                result = conn.execute(text("SHOW TABLES LIKE 'transactions'"))
-                if result.fetchone():
-                    print("Dropping orphaned table 'transactions'...")
-                    conn.execute(text("DROP TABLE IF EXISTS transactions"))
-                
-                # Drop student_profiles table (it references users)
-                result = conn.execute(text("SHOW TABLES LIKE 'student_profiles'"))
-                if result.fetchone():
-                    print("Dropping orphaned table 'student_profiles'...")
-                    conn.execute(text("DROP TABLE IF EXISTS student_profiles"))
-                
-                # Re-enable foreign key checks
-                conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-                conn.commit()
+            # Disable foreign key checks temporarily
+            db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+            db.session.commit()
+            
+            # Get all tables in the database
+            result = db.session.execute(text("SHOW TABLES"))
+            tables = [row[0] for row in result]
+            
+            # Drop all tables
+            for table in tables:
+                print(f"Dropping table '{table}'...")
+                db.session.execute(text(f"DROP TABLE IF EXISTS `{table}`"))
+                db.session.commit()
+            
+            # Re-enable foreign key checks
+            db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+            db.session.commit()
+            
+            print("All tables dropped successfully.")
+            
         except Exception as e:
-            print(f"Warning: Could not drop orphaned tables: {e}")
+            print(f"Error during table cleanup: {e}")
+            # Make sure to re-enable foreign key checks even if there's an error
+            try:
+                db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+                db.session.commit()
+            except:
+                pass
+            raise
         
-        db.drop_all()
+        # Create all tables
+        print("Creating all tables...")
         db.create_all()
         
         # Create Faculties
