@@ -1,0 +1,2 @@
+# finance-accounting-system-eui
+The Finance & Accounting System (F&AS) is a comprehensive web-based platform designed to help organizations streamline their financial operations, manage budgets, and generate analytical reports efficiently. This project serves as a full software engineering case study — combining strategic IT management, front-end development, full-stack implementation, and software testing practices.
